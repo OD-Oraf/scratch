@@ -1,0 +1,10 @@
+Name,Age,Score
+John,25,85
+Alice,30,92
+Bob,40,78
+Emily,22,95
+Michael,35,80
+Shirly,35,20
+Hector,35,23
+OD,35,12
+Bella,35,0,0

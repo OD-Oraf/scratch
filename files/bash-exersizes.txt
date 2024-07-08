@@ -1,0 +1,39 @@
+File Manipulation:
+    Write a script to count the number of lines, words, and characters in a file. -> wc {file}
+    Write a script to search for a specific string in multiple files in a directory.
+
+System Administration:
+    Write a script to check disk usage and notify if it exceeds a certain threshold.
+    Write a script to monitor CPU usage and alert if it exceeds a certain percentage.
+
+Text Processing:
+    Write a script to extract email addresses from a text file.
+    Write a script to convert all text in a file to lowercase.
+
+Automation:
+    Write a script to automate the backup of specific files or directories.
+    Write a script to automate the installation of software packages on a Linux system.
+
+Networking:
+    Write a script to ping a list of hosts and report their availability.
+    Write a script to monitor network traffic and generate reports.
+
+Data Analysis:
+    Write a script to calculate the average, minimum, and maximum values from a list of numbers stored in a file.
+    Write a script to plot a graph from data stored in a CSV file.
+
+Web Scraping:
+    Write a script to scrape data from a website and store it in a file.
+    Write a script to automate the download of files from a website.
+
+User Management:
+    Write a script to create new user accounts on a Linux system.
+    Write a script to generate random passwords for user accounts.
+
+Monitoring and Logging:
+    Write a script to monitor log files for specific patterns and send alerts if found.
+    Write a script to rotate log files and compress older logs to save disk space.
+
+Encryption and Security:
+    Write a script to encrypt and decrypt files using GPG.
+    Write a script to generate secure random passwords.
