@@ -1,3 +1,3 @@
-#!bin/bash
+#!/bin/bash
 
 read -p "enter col"
