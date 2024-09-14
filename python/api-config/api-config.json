@@ -1,0 +1,35 @@
+{
+    "spec": {
+        "assetId": "mule-health-fgw"
+    },
+    "routing": [
+        {
+            "rules": {
+                "path": "route1",
+                "methods": "GET"
+            },
+            "upstreams": [
+                {
+                    "uri": "${upstream1}",
+                    "weight": 50
+                },
+                {
+                    "uri": "${upstream2}",
+                    "weight": 50
+                }
+            ]
+        },
+        {
+            "rules": {
+                "path": "route2",
+                "methods": "GET"
+            },
+            "upstreams": [
+                {
+                    "uri": "${upstream3}",
+                    "weight": 100
+                }
+            ]
+        }
+    ]
+}
