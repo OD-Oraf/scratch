@@ -1,0 +1,12 @@
+route1:
+  path: /route1
+  methods: GET
+  upstream1: https://goolge.com
+  upstream2: https://firefox.com
+route2:
+  path: /route2
+  methods: GET
+  upstream1: https://facebook.com
+asset:
+  id: 'mule-health-fgw'
+  version: "1.0.0"
