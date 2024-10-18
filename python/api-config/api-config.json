@@ -1,32 +1,32 @@
 {
     "spec": {
-        "assetId": "mule-health-fgw"
+        "assetId": "{{ asset.id }}"
     },
     "routing": [
         {
             "rules": {
-                "path": "route1",
-                "methods": "GET"
+                "path": "{{ route1.path }}",
+                "methods": "{{ route1.methods }}"
             },
             "upstreams": [
                 {
-                    "uri": "${upstream1}",
+                    "uri": "{{ route1.upstream1 }}",
                     "weight": 50
                 },
                 {
-                    "uri": "${upstream2}",
+                    "uri": "{{ route1.upstream2 }}",
                     "weight": 50
                 }
             ]
         },
         {
             "rules": {
-                "path": "route2",
-                "methods": "GET"
+                "path": "{{ route2.path }}",
+                "methods": "{{ route2.methods }}"
             },
             "upstreams": [
                 {
-                    "uri": "${upstream3}",
+                    "uri": "{{ route2.upstream1 }}",
                     "weight": 100
                 }
             ]
