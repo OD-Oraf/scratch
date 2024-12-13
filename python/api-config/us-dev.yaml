@@ -10,3 +10,6 @@ route2:
 asset:
   id: 'mule-health-fgw'
   version: "1.0.0"
+  description: THis is a sample description
+  contactName: OD Oraf
+  contactEmail: poseidonog@gmail.com
