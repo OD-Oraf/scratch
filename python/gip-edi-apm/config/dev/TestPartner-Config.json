@@ -1,0 +1,11 @@
+[
+  {
+    "artifactConfig": "endpoints/file.json"
+  },
+  {
+    "artifactConfig": "partners/file.json"
+  },
+  {
+    "artifactConfig": "message-type/file.json"
+  }
+]
