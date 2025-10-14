@@ -6,6 +6,10 @@ on:
     - cron: '0 9 * * 1'
   workflow_dispatch:
     inputs:
+      pom_file_path:
+        description: 'Path to the directory containing pom.xml'
+        required: false
+        default: 'java/my-app'
       confluence_url:
         description: 'Confluence URL'
         required: false
@@ -37,7 +41,7 @@ jobs:
           cache: 'maven'
       
       - name: Upgrade dependencies with Maven
-        working-directory: java/my-app
+        working-directory: ${{ inputs.pom_file_path || 'java/my-app' }}
         run: |
           cp pom.xml pom.xml.old
           mvn versions:display-property-updates
@@ -47,13 +51,18 @@ jobs:
           cp pom.xml.old pom.xml
       
       - name: Parse dependency changes and generate outputs
-        if: ${{ hashFiles('java/my-app/pom.xml.new') != '' }}
+        if: ${{ hashFiles(format('{0}/pom.xml.new', inputs.pom_file_path || 'java/my-app')) != '' }}
+        env:
+          POM_DIR: ${{ inputs.pom_file_path || 'java/my-app' }}
         run: |
           python3 << 'EOF'
           import xml.etree.ElementTree as ET
           from datetime import datetime
           import os
           import json
+          
+          # Get POM directory from environment
+          pom_dir = os.environ.get('POM_DIR', 'java/my-app')
           
           def parse_pom_file(pom_file):
               """Parse POM file to extract dependencies and their versions."""
@@ -138,8 +147,8 @@ jobs:
           
           # Parse the changes
           changes = compare_pom_files(
-              'java/my-app/pom.xml.old',
-              'java/my-app/pom.xml.new'
+              f'{pom_dir}/pom.xml.old',
+              f'{pom_dir}/pom.xml.new'
           )
           
           print(f"Found {len(changes)} dependency updates")
@@ -150,6 +159,8 @@ jobs:
           
           for change in changes:
               summary += f"- **{change['artifact']}**: `{change['old_version']}` → `{change['new_version']}`\n"
+          
+          summary += "\n\n"
           
           # Write to GitHub step summary
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
@@ -192,7 +203,7 @@ jobs:
         run: pip install requests
       
       - name: Update Confluence Page
-        if: ${{ hashFiles('java/my-app/pom.xml.new') != '' }}
+        if: ${{ hashFiles(format('{0}/pom.xml.new', inputs.pom_file_path || 'java/my-app')) != '' }}
         env:
           CONFLUENCE_URL: ${{ inputs.confluence_url || secrets.CONFLUENCE_URL }}
           CONFLUENCE_USERNAME: ${{ inputs.confluence_username || secrets.CONFLUENCE_USERNAME }}
@@ -241,8 +252,8 @@ jobs:
           current_content = page_data['body']['storage']['value']
           page_title = page_data['title']
           
-          # Append new content to existing content
-          updated_content = current_content + "\n" + new_content
+          # Append new content to existing content (new at top with separator)
+          updated_content = new_content + "\n<hr>\n" + current_content 
           
           # Update the page
           update_data = {
