@@ -20,13 +20,8 @@ on:
         default: '393218'
 
 jobs:
-  simulate-dependency-updates:
+  update-dependencies-and-confluence:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: java/my-app
-    outputs:
-      has_changes: ${{ steps.diff.outputs.has_changes }}
     
     steps:
       - name: Checkout repository
@@ -35,6 +30,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Simulate dependency changes
+        working-directory: java/my-app
         run: |
           echo "Simulating dependency version upgrades..."
           echo "Using pre-created pom.xml.old and pom.xml.new files"
@@ -42,6 +38,7 @@ jobs:
       
       - name: Generate dependency diff
         id: diff
+        working-directory: java/my-app
         run: |
           if diff pom.xml.old pom.xml.new > pom-diff.txt; then
             echo "has_changes=false" >> $GITHUB_OUTPUT
@@ -52,39 +49,15 @@ jobs:
             cat pom-diff.txt
           fi
       
-      - name: Upload artifacts
-        if: steps.diff.outputs.has_changes == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: dependency-updates
-          path: |
-            java/my-app/pom.xml.old
-            java/my-app/pom.xml.new
-            java/my-app/pom-diff.txt
-      
       - name: Create summary
         if: steps.diff.outputs.has_changes == 'true'
+        working-directory: java/my-app
         run: |
           echo "## Dependency Updates Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`diff" >> $GITHUB_STEP_SUMMARY
           cat pom-diff.txt >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-
-  update-confluence:
-    runs-on: ubuntu-latest
-    needs: simulate-dependency-updates
-    if: needs.simulate-dependency-updates.outputs.has_changes == 'true'
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      
-      - name: Download artifacts from previous job
-        uses: actions/download-artifact@v4
-        with:
-          name: dependency-updates
-          path: artifacts
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -97,6 +70,7 @@ jobs:
       
       - name: Parse dependency changes
         id: parse
+        if: steps.diff.outputs.has_changes == 'true'
         run: |
           python3 << 'EOF'
           import re
@@ -167,8 +141,8 @@ jobs:
           
           # Parse the changes by comparing POM files
           changes = compare_pom_files(
-              'artifacts/java/my-app/pom.xml.old',
-              'artifacts/java/my-app/pom.xml.new'
+              'java/my-app/pom.xml.old',
+              'java/my-app/pom.xml.new'
           )
           
           # Generate Confluence HTML content
@@ -213,6 +187,7 @@ jobs:
           EOF
       
       - name: Update Confluence Page
+        if: steps.diff.outputs.has_changes == 'true'
         env:
           CONFLUENCE_URL: ${{ inputs.confluence_url || secrets.CONFLUENCE_URL }}
           CONFLUENCE_USERNAME: ${{ inputs.confluence_username || secrets.CONFLUENCE_USERNAME }}
@@ -231,13 +206,43 @@ jobs:
           api_token = os.environ.get('CONFLUENCE_API_TOKEN')
           page_id = os.environ.get('CONFLUENCE_PAGE_ID')
           
+          print("=" * 80)
+          print("CONFLUENCE UPDATE PROCESS")
+          print("=" * 80)
+          print(f"Confluence URL: {confluence_url}")
+          print(f"Username: {username}")
+          print(f"Page ID: {page_id}")
+          print(f"API Token: {'***' if api_token else 'NOT SET'}")
+          print()
+          
           if not all([confluence_url, username, api_token, page_id]):
-              print("Missing Confluence credentials. Skipping update.")
+              print("❌ Missing Confluence credentials. Skipping update.")
+              print(f"  - URL: {'✓' if confluence_url else '✗'}")
+              print(f"  - Username: {'✓' if username else '✗'}")
+              print(f"  - API Token: {'✓' if api_token else '✗'}")
+              print(f"  - Page ID: {'✓' if page_id else '✗'}")
               exit(0)
           
           # Read the HTML content to append
-          with open('confluence-content.html', 'r') as f:
-              new_content = f.read()
+          print("Reading generated HTML content...")
+          try:
+              with open('confluence-content.html', 'r') as f:
+                  new_content = f.read()
+              print(f"✓ HTML content loaded ({len(new_content)} characters)")
+              print()
+              print("Content preview:")
+              print("-" * 80)
+              print(new_content[:500] + "..." if len(new_content) > 500 else new_content)
+              print("-" * 80)
+              print()
+          except FileNotFoundError:
+              print("❌ Error: confluence-content.html not found!")
+              print("Available files:")
+              import os
+              for root, dirs, files in os.walk('.'):
+                  for file in files:
+                      print(f"  - {os.path.join(root, file)}")
+              exit(1)
           
           # Setup authentication and headers for v2 API
           auth = HTTPBasicAuth(username, api_token)
@@ -245,12 +250,15 @@ jobs:
           
           # Get current page using v2 API
           # API Reference: https://developer.atlassian.com/cloud/confluence/rest/v2/api-group-page/#api-pages-id-get
+          print(f"Fetching current page content from Confluence...")
           get_url = f"{confluence_url}/api/v2/pages/{page_id}?body-format=storage"
+          print(f"GET URL: {get_url}")
+          
           response = requests.get(get_url, auth=auth, headers=headers)
           
           if response.status_code != 200:
-              print(f"Failed to get page: {response.status_code}")
-              print(response.text)
+              print(f"❌ Failed to get page: {response.status_code}")
+              print(f"Response: {response.text}")
               exit(1)
           
           page_data = response.json()
@@ -258,8 +266,17 @@ jobs:
           current_content = page_data['body']['storage']['value']
           page_title = page_data['title']
           
+          print(f"✓ Current page retrieved successfully")
+          print(f"  - Title: {page_title}")
+          print(f"  - Current version: {current_version}")
+          print(f"  - Current content length: {len(current_content)} characters")
+          print()
+          
           # Append new content to existing content
           updated_content = current_content + "\n" + new_content
+          print(f"Preparing update...")
+          print(f"  - New content length: {len(updated_content)} characters")
+          print()
           
           # Update the page using v2 API
           # API Reference: https://developer.atlassian.com/cloud/confluence/rest/v2/api-group-page/#api-pages-id-put
@@ -278,22 +295,36 @@ jobs:
           }
           
           put_url = f"{confluence_url}/api/v2/pages/{page_id}"
+          print(f"Updating page...")
+          print(f"PUT URL: {put_url}")
+          print(f"New version: {current_version + 1}")
+          
           response = requests.put(put_url, auth=auth, headers=headers, json=update_data)
           
           if response.status_code == 200:
-              print("Successfully updated Confluence page!")
+              print()
+              print("=" * 80)
+              print("✓ SUCCESS - Confluence page updated!")
+              print("=" * 80)
               print(f"Page URL: {confluence_url}/pages/viewpage.action?pageId={page_id}")
-              print(f"Updated to version {current_version + 1}")
+              print(f"Updated to version: {current_version + 1}")
+              print()
           else:
-              print(f"Failed to update page: {response.status_code}")
-              print(response.text)
+              print()
+              print("=" * 80)
+              print(f"❌ FAILED - Could not update page: {response.status_code}")
+              print("=" * 80)
+              print(f"Response: {response.text}")
+              print()
               exit(1)
           EOF
       
-      - name: Upload Confluence content
+      - name: Upload artifacts
+        if: steps.diff.outputs.has_changes == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: confluence-update
+          name: dependency-updates
           path: |
             confluence-content.html
             changes.json
+            java/my-app/pom-diff.txt

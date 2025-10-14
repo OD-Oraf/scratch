@@ -1,0 +1,38 @@
+[
+  {
+    "artifact": "junit",
+    "groupId": "junit",
+    "old_version": "4.11",
+    "new_version": "4.13.2"
+  },
+  {
+    "artifact": "spring-boot-starter-web",
+    "groupId": "org.springframework.boot",
+    "old_version": "2.5.0",
+    "new_version": "2.7.14"
+  },
+  {
+    "artifact": "guava",
+    "groupId": "com.google.guava",
+    "old_version": "30.0-jre",
+    "new_version": "32.1.2-jre"
+  },
+  {
+    "artifact": "maven-clean-plugin",
+    "groupId": "org.apache.maven.plugins",
+    "old_version": "3.1.0",
+    "new_version": "3.2.0"
+  },
+  {
+    "artifact": "maven-compiler-plugin",
+    "groupId": "org.apache.maven.plugins",
+    "old_version": "3.8.0",
+    "new_version": "3.11.0"
+  },
+  {
+    "artifact": "maven-surefire-plugin",
+    "groupId": "org.apache.maven.plugins",
+    "old_version": "2.22.1",
+    "new_version": "3.0.0"
+  }
+]
