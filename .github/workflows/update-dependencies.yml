@@ -25,6 +25,8 @@ on:
 
 jobs:
   update-dependencies-and-confluence:
+    permissions:
+      contents: write  # Required to push changes to the repository
     runs-on: ubuntu-latest
     
     steps:
