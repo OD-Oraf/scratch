@@ -1,0 +1,12 @@
+asset:
+  id: mule-health-fgw
+  version: 1.0.0
+route1:
+  methods: GET
+  path: /route1
+  upstream1: https://goolge.com
+  upstream2: https://firefox.com
+route2:
+  methods: GET
+  path: /route1
+  upstream1: https://facebook.com

@@ -51,19 +51,13 @@ jobs:
           echo
           
           # Check for available dependency updates
-          echo " Checking for dependency updates..."
-          mvn versions:display-dependency-updates
+          echo "🔍 Checking for available updates (dependencies & plugins)..."
+          mvn versions:display-property-updates
           echo
           
-          # Update dependencies to latest versions
-          echo "  Upgrading dependencies..."
-          mvn versions:use-latest-versions -DallowMajorUpdates=false -DallowMinorUpdates=true
-          mvn versions:use-latest-releases
-          echo
-          
-          # Update plugins to latest versions
-          echo "  Upgrading plugins..."
-          mvn versions:use-latest-versions -DallowMajorUpdates=false
+          # Update all versions using properties (dependencies + plugins)
+          echo "⬆️  Upgrading all versions (properties)..."
+          mvn versions:update-properties -DallowMajorUpdates=false
           echo
           
           # Clean up Maven backup files

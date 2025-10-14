@@ -2,7 +2,6 @@ import base64
 import json
 
 
-
 def get_base64_encoding(file):
     string_bytes = file.encode('utf-8')
     base64_bytes = base64.b64encode(string_bytes)
