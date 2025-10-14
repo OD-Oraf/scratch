@@ -9,7 +9,7 @@ on:
       confluence_url:
         description: 'Confluence URL'
         required: false
-        default: 'https://odoraf.atlassian.ne/wiki'
+        default: 'https://odoraf.atlassian.net/wiki'
       confluence_username:
         description: 'Confluence username/email'
         required: false
