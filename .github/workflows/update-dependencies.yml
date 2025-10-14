@@ -47,7 +47,7 @@ jobs:
           cp pom.xml.old pom.xml
       
       - name: Parse dependency changes and generate outputs
-        if: [ -f java/my-app/pom.xml.old ] && [ -f java/my-app/pom.xml.new ]
+        if: ${{ hashFiles('java/my-app/pom.xml.new') != '' }}
         run: |
           python3 << 'EOF'
           import xml.etree.ElementTree as ET
@@ -192,7 +192,7 @@ jobs:
         run: pip install requests
       
       - name: Update Confluence Page
-        if: [ -f java/my-app/pom.xml.old ] && [ -f java/my-app/pom.xml.new ]
+        if: ${{ hashFiles('java/my-app/pom.xml.new') != '' }}
         env:
           CONFLUENCE_URL: ${{ inputs.confluence_url || secrets.CONFLUENCE_URL }}
           CONFLUENCE_USERNAME: ${{ inputs.confluence_username || secrets.CONFLUENCE_USERNAME }}
