@@ -46,9 +46,15 @@ jobs:
           cp pom.xml pom.xml.old
           mvn versions:display-property-updates
           mvn versions:update-properties -DallowMajorUpdates=false
+          
+          # Increment patch version (e.g., 1.0.0 -> 1.0.1)
+          mvn build-helper:parse-version versions:set \
+            -DnewVersion=\${parsedVersion.majorVersion}.\${parsedVersion.minorVersion}.\${parsedVersion.nextIncrementalVersion} \
+            -DgenerateBackupPoms=false
+          
           find . -name "*.versionsBackup" -delete
           cp pom.xml pom.xml.new
-          cp pom.xml.old pom.xml
+          cp pom.xml.new pom.xml
       
       - name: Parse dependency changes and generate outputs
         if: ${{ hashFiles(format('{0}/pom.xml.new', inputs.pom_file_path || 'java/my-app')) != '' }}
@@ -57,7 +63,6 @@ jobs:
         run: |
           python3 << 'EOF'
           import xml.etree.ElementTree as ET
-          from datetime import datetime
           import os
           import json
           
@@ -67,10 +72,16 @@ jobs:
           def parse_pom_file(pom_file):
               """Parse POM file to extract dependencies and their versions."""
               deps = {}
+              project_version = None
               try:
                   tree = ET.parse(pom_file)
                   root = tree.getroot()
                   ns = {'maven': 'http://maven.apache.org/POM/4.0.0'}
+                  
+                  # Extract project version
+                  version_elem = root.find('.//maven:version', ns)
+                  if version_elem is not None:
+                      project_version = version_elem.text
                   
                   # First, extract all properties
                   properties = {}
@@ -121,32 +132,32 @@ jobs:
               except Exception as e:
                   print(f"Error parsing POM file: {e}")
               
-              return deps
+              return deps, project_version
           
           def compare_pom_files(old_pom, new_pom):
               """Compare two POM files and extract version changes."""
-              old_deps = parse_pom_file(old_pom)
-              new_deps = parse_pom_file(new_pom)
+              old_deps, old_version = parse_pom_file(old_pom)
+              new_deps, new_version = parse_pom_file(new_pom)
               
               changes = []
               
               for artifact, new_info in new_deps.items():
                   if artifact in old_deps:
-                      old_version = old_deps[artifact]['version']
-                      new_version = new_info['version']
+                      old_version_dep = old_deps[artifact]['version']
+                      new_version_dep = new_info['version']
                       
-                      if old_version != new_version:
+                      if old_version_dep != new_version_dep:
                           changes.append({
                               'artifact': artifact,
                               'groupId': new_info['groupId'],
-                              'old_version': old_version,
-                              'new_version': new_version
+                              'old_version': old_version_dep,
+                              'new_version': new_version_dep
                           })
               
-              return changes
+              return changes, new_version
           
           # Parse the changes
-          changes = compare_pom_files(
+          changes, pom_version = compare_pom_files(
               f'{pom_dir}/pom.xml.old',
               f'{pom_dir}/pom.xml.new'
           )
@@ -154,7 +165,7 @@ jobs:
           print(f"Found {len(changes)} dependency updates")
           
           # Generate GitHub summary in Markdown
-          summary = f"## Maven Dependency Updates - {datetime.now().strftime('%Y-%m-%d')}\n\n"
+          summary = f"## Maven Dependency Updates - {pom_version or 'Unknown Version'}\n\n"
           summary += f"**Total updates: {len(changes)}**\n\n"
           
           for change in changes:
@@ -168,7 +179,7 @@ jobs:
           
           # Generate Confluence HTML content
           print("Generating Confluence HTML...")
-          html_content = f"""<h2>Maven Dependency Updates - {datetime.now().strftime('%Y-%m-%d')}</h2>
+          html_content = f"""<h2>Maven Dependency Updates - {pom_version or 'Unknown Version'}</h2>
           <p><strong>Total updates: {len(changes)}</strong></p>
           <ul>
           """
@@ -193,6 +204,15 @@ jobs:
           print(f"✓ ALL OUTPUTS GENERATED SUCCESSFULLY ({len(changes)} updates)")
           print("=" * 80)
           EOF
+      
+      - name: Commit and push updated pom.xml
+        if: ${{ hashFiles(format('{0}/pom.xml.new', inputs.pom_file_path || 'java/my-app')) != '' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ${{ inputs.pom_file_path || 'java/my-app' }}/pom.xml
+          git commit -m "chore: update dependencies and increment version [skip ci]"
+          git push
       
       - name: Set up Python
         uses: actions/setup-python@v5
