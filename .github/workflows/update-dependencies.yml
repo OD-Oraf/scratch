@@ -101,52 +101,75 @@ jobs:
           python3 << 'EOF'
           import re
           import json
+          import xml.etree.ElementTree as ET
           from datetime import datetime
           
-          def parse_pom_diff(diff_file):
-              """Parse the pom.xml diff to extract dependency changes."""
+          def parse_pom_file(pom_file):
+              """Parse POM file to extract dependencies and their versions."""
+              deps = {}
+              try:
+                  tree = ET.parse(pom_file)
+                  root = tree.getroot()
+                  ns = {'maven': 'http://maven.apache.org/POM/4.0.0'}
+                  
+                  # Parse dependencies
+                  for dep in root.findall('.//maven:dependency', ns):
+                      artifact_elem = dep.find('maven:artifactId', ns)
+                      version_elem = dep.find('maven:version', ns)
+                      group_elem = dep.find('maven:groupId', ns)
+                      
+                      if artifact_elem is not None and version_elem is not None:
+                          artifact = artifact_elem.text
+                          group = group_elem.text if group_elem is not None else ''
+                          deps[artifact] = {
+                              'groupId': group,
+                              'version': version_elem.text
+                          }
+                  
+                  # Parse plugins
+                  for plugin in root.findall('.//maven:plugin', ns):
+                      artifact_elem = plugin.find('maven:artifactId', ns)
+                      version_elem = plugin.find('maven:version', ns)
+                      
+                      if artifact_elem is not None and version_elem is not None:
+                          artifact = artifact_elem.text
+                          deps[artifact] = {
+                              'groupId': 'org.apache.maven.plugins',
+                              'version': version_elem.text
+                          }
+              
+              except Exception as e:
+                  print(f"Error parsing POM file: {e}")
+              
+              return deps
+          
+          def compare_pom_files(old_pom, new_pom):
+              """Compare two POM files and extract version changes."""
+              old_deps = parse_pom_file(old_pom)
+              new_deps = parse_pom_file(new_pom)
+              
               changes = []
               
-              try:
-                  with open(diff_file, 'r') as f:
-                      diff_content = f.read()
-                  
-                  lines = diff_content.split('\n')
-                  
-                  i = 0
-                  while i < len(lines):
-                      line = lines[i]
+              for artifact, new_info in new_deps.items():
+                  if artifact in old_deps:
+                      old_version = old_deps[artifact]['version']
+                      new_version = new_info['version']
                       
-                      # Look for dependency or plugin blocks
-                      if '<artifactId>' in line:
-                          artifact_match = re.search(r'<artifactId>(.*?)</artifactId>', line)
-                          if artifact_match:
-                              artifact = artifact_match.group(1)
-                              
-                              # Look ahead for version changes
-                              for j in range(i, min(i + 10, len(lines))):
-                                  if lines[j].startswith('<') and '<version>' in lines[j]:
-                                      old_version_match = re.search(r'<version>(.*?)</version>', lines[j])
-                                      if old_version_match and j + 1 < len(lines):
-                                          # Check next line for new version
-                                          if lines[j + 1].startswith('>') and '<version>' in lines[j + 1]:
-                                              new_version_match = re.search(r'<version>(.*?)</version>', lines[j + 1])
-                                              if new_version_match:
-                                                  changes.append({
-                                                      'artifact': artifact,
-                                                      'old_version': old_version_match.group(1),
-                                                      'new_version': new_version_match.group(1)
-                                                  })
-                                                  break
-                      i += 1
-              
-              except FileNotFoundError:
-                  print("No diff file found")
+                      if old_version != new_version:
+                          changes.append({
+                              'artifact': artifact,
+                              'groupId': new_info['groupId'],
+                              'old_version': old_version,
+                              'new_version': new_version
+                          })
               
               return changes
           
-          # Parse the changes
-          changes = parse_pom_diff('artifacts/java/my-app/pom-diff.txt')
+          # Parse the changes by comparing POM files
+          changes = compare_pom_files(
+              'artifacts/java/my-app/pom.xml.old',
+              'artifacts/java/my-app/pom.xml.new'
+          )
           
           # Generate Confluence HTML content
           html_content = f"""
