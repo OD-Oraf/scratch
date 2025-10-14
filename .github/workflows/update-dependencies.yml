@@ -117,6 +117,22 @@ jobs:
                   root = tree.getroot()
                   ns = {'maven': 'http://maven.apache.org/POM/4.0.0'}
                   
+                  # First, extract all properties
+                  properties = {}
+                  properties_elem = root.find('.//maven:properties', ns)
+                  if properties_elem is not None:
+                      for prop in properties_elem:
+                          # Remove namespace prefix from tag name
+                          prop_name = prop.tag.replace('{http://maven.apache.org/POM/4.0.0}', '')
+                          properties[prop_name] = prop.text
+                  
+                  def resolve_version(version_text):
+                      """Resolve property references like ${property.name} to actual values."""
+                      if version_text and version_text.startswith('${') and version_text.endswith('}'):
+                          prop_name = version_text[2:-1]  # Remove ${ and }
+                          return properties.get(prop_name, version_text)
+                      return version_text
+                  
                   # Parse dependencies
                   for dep in root.findall('.//maven:dependency', ns):
                       artifact_elem = dep.find('maven:artifactId', ns)
@@ -126,9 +142,11 @@ jobs:
                       if artifact_elem is not None and version_elem is not None:
                           artifact = artifact_elem.text
                           group = group_elem.text if group_elem is not None else ''
+                          raw_version = version_elem.text
+                          resolved_version = resolve_version(raw_version)
                           deps[artifact] = {
                               'groupId': group,
-                              'version': version_elem.text
+                              'version': resolved_version
                           }
                   
                   # Parse plugins
@@ -138,9 +156,11 @@ jobs:
                       
                       if artifact_elem is not None and version_elem is not None:
                           artifact = artifact_elem.text
+                          raw_version = version_elem.text
+                          resolved_version = resolve_version(raw_version)
                           deps[artifact] = {
                               'groupId': 'org.apache.maven.plugins',
-                              'version': version_elem.text
+                              'version': resolved_version
                           }
               
               except Exception as e:
