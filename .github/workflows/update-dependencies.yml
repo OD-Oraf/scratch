@@ -17,7 +17,7 @@ on:
       confluence_page_id:
         description: 'Confluence page ID to update'
         required: false
-        default: '1'
+        default: '393218'
 
 jobs:
   simulate-dependency-updates:
