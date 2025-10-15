@@ -1,0 +1,38 @@
+name: Update Maven Dependencies - Caller
+
+on:
+  schedule:
+    # Run every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+    inputs:
+      pom_file_path:
+        description: 'Path to the directory containing pom.xml'
+        required: false
+        default: 'java/my-app'
+      confluence_url:
+        description: 'Confluence URL'
+        required: false
+        default: 'https://odoraf.atlassian.net/wiki'
+      confluence_username:
+        description: 'Confluence username/email'
+        required: false
+        default: 'poseidonog@gmail.com'
+      confluence_page_id:
+        description: 'Confluence page ID to update'
+        required: false
+        default: '393218'
+
+jobs:
+  call-update-dependencies:
+    uses: ./.github/workflows/update-dependencies.yml
+    with:
+      pom_file_path: ${{ inputs.pom_file_path || 'java/my-app' }}
+      confluence_url: ${{ inputs.confluence_url || 'https://odoraf.atlassian.net/wiki' }}
+      confluence_username: ${{ inputs.confluence_username || 'poseidonog@gmail.com' }}
+      confluence_page_id: ${{ inputs.confluence_page_id || '393218' }}
+    secrets:
+      CONFLUENCE_API_TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
+      CONFLUENCE_URL: ${{ secrets.CONFLUENCE_URL }}
+      CONFLUENCE_USERNAME: ${{ secrets.CONFLUENCE_USERNAME }}
+      CONFLUENCE_PAGE_ID: ${{ secrets.CONFLUENCE_PAGE_ID }}
