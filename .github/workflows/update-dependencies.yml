@@ -1,27 +1,41 @@
-name: Update Maven Dependencies and Confluence
+name: Update Maven Dependencies and Confluence (Reusable)
 
 on:
-  schedule:
-    # Run every Monday at 9 AM UTC
-    - cron: '0 9 * * 1'
-  workflow_dispatch:
+  workflow_call:
     inputs:
       pom_file_path:
         description: 'Path to the directory containing pom.xml'
+        type: string
         required: false
         default: 'java/my-app'
       confluence_url:
         description: 'Confluence URL'
+        type: string
         required: false
         default: 'https://odoraf.atlassian.net/wiki'
       confluence_username:
         description: 'Confluence username/email'
+        type: string
         required: false
         default: 'poseidonog@gmail.com'
       confluence_page_id:
         description: 'Confluence page ID to update'
+        type: string
         required: false
         default: '393218'
+    secrets:
+      CONFLUENCE_API_TOKEN:
+        description: 'Confluence API token for authentication'
+        required: true
+      CONFLUENCE_URL:
+        description: 'Confluence URL (optional override)'
+        required: false
+      CONFLUENCE_USERNAME:
+        description: 'Confluence username (optional override)'
+        required: false
+      CONFLUENCE_PAGE_ID:
+        description: 'Confluence page ID (optional override)'
+        required: false
 
 jobs:
   update-dependencies-and-confluence:
