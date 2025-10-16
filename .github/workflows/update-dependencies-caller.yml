@@ -23,6 +23,9 @@ on:
         required: false
         default: '393218'
 
+permissions:
+  contents: write  # Required for reusable workflow to push changes
+
 jobs:
   call-update-dependencies:
     uses: ./.github/workflows/update-dependencies.yml
