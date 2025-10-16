@@ -57,9 +57,16 @@ jobs:
           cache: 'maven'
       
       - name: Upgrade dependencies with Maven
-        working-directory: ${{ inputs.pom_file_path || 'java/my-app' }}
         run: |
-          cp pom.xml pom.xml.old
+          POM_DIR="${{ inputs.pom_file_path || 'java/my-app' }}"
+          
+          # Create backup of original POM
+          cp $POM_DIR/pom.xml $POM_DIR/pom.xml.old
+          
+          # Change to POM directory for Maven commands
+          cd $POM_DIR
+          
+          # Display and update property-based versions
           mvn versions:display-property-updates
           mvn versions:update-properties -DallowMajorUpdates=false
           
@@ -68,9 +75,13 @@ jobs:
             -DnewVersion=\${parsedVersion.majorVersion}.\${parsedVersion.minorVersion}.\${parsedVersion.nextIncrementalVersion} \
             -DgenerateBackupPoms=false
           
+          # Clean up backup files
           find . -name "*.versionsBackup" -delete
-          cp pom.xml pom.xml.new
-          cp pom.xml.new pom.xml
+          
+          # Return to root and save updated POM
+          cd -
+          cp $POM_DIR/pom.xml $POM_DIR/pom.xml.new
+          cp $POM_DIR/pom.xml.new $POM_DIR/pom.xml
       
       - name: Parse dependency changes and generate outputs
         if: ${{ hashFiles(format('{0}/pom.xml.new', inputs.pom_file_path || 'java/my-app')) != '' }}
