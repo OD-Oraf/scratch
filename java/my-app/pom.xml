@@ -6,7 +6,7 @@
 
   <groupId>com.example</groupId>
   <artifactId>my-app</artifactId>
-  <version>1.0.6</version>
+  <version>1.0.12</version>
 
   <name>my-app</name>
   <!-- FIXME change it to the project's website -->
@@ -24,7 +24,7 @@
     
     <!-- Plugin versions -->
     <maven-clean-plugin.version>3.5.0</maven-clean-plugin.version>
-    <maven-resources-plugin.version>3.3.1</maven-resources-plugin.version>
+    <maven-resources-plugin.version>3.4.0</maven-resources-plugin.version>
     <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
     <maven-surefire-plugin.version>2.22.2</maven-surefire-plugin.version>
     <maven-jar-plugin.version>3.5.0</maven-jar-plugin.version>
