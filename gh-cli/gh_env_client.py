@@ -1,39 +1,19 @@
 #!/usr/bin/env python3
 
 import json
-import re
 import subprocess
 import sys
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 
 ENV_NAME = "staging"
 
+ORG_NAME = "OD-ORAF"
 REPOSITORIES = [
-    "OD-ORAF/scratch"
+    "scratch"
 ]
 
 
-@dataclass(frozen=True)
-class RepoRef:
-    owner: str
-    repo: str
-
-    @property
-    def full_name(self) -> str:
-        return f"{self.owner}/{self.repo}"
-
-
-_REPO_RE = re.compile(r"^(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+)$")
-
-
-def _parse_repo_ref(raw: str) -> RepoRef:
-    raw = raw.strip()
-    m = _REPO_RE.match(raw)
-    if not m:
-        raise ValueError(f"Invalid repo reference '{raw}'. Expected 'owner/repo'.")
-    return RepoRef(owner=m.group("owner"), repo=m.group("repo"))
 
 
 def _ensure_gh_available() -> None:
@@ -53,8 +33,8 @@ def _ensure_gh_authed() -> None:
         raise RuntimeError("Not authenticated with GitHub CLI. Run: gh auth login") from e
 
 
-def _create_environment(repo: RepoRef, env_name: str) -> Tuple[bool, str]:
-    endpoint = f"/repos/{repo.owner}/{repo.repo}/environments/{env_name}"
+def _create_environment(org: str, repo: str, env_name: str) -> Tuple[bool, str]:
+    endpoint = f"/repos/{org}/{repo}/environments/{env_name}"
     cmd = ["gh", "api", "-X", "PUT", endpoint]
 
     p = subprocess.run(cmd, text=True, capture_output=True)
@@ -133,7 +113,7 @@ def list_org_teams(org: str) -> Tuple[bool, Optional[List[Dict[str, Any]]], Opti
     return False, None, err
 
 
-def create_environment_with_protection(
+def update_environment_settings(
     owner: str,
     repo: str,
     environment_name: str,
@@ -184,6 +164,8 @@ def create_environment_with_protection(
 
 def main() -> int:
     env_name = ENV_NAME.strip()
+
+    # Check  ENV name and existence of GH CLI
     if not env_name:
         print("ERROR: ENV_NAME is empty", file=sys.stderr)
         return 2
@@ -199,28 +181,39 @@ def main() -> int:
         print("ERROR: REPOSITORIES is empty", file=sys.stderr)
         return 2
 
-    repos: List[RepoRef] = []
-    for raw in REPOSITORIES:
-        try:
-            repos.append(_parse_repo_ref(raw))
-        except ValueError as e:
-            print(f"ERROR: {e}", file=sys.stderr)
-            return 2
+    if not ORG_NAME:
+        print("ERROR: ORG_NAME is empty", file=sys.stderr)
+        return 2
 
-    failures: List[Tuple[RepoRef, str]] = []
+    failures: List[Tuple[str, str]] = []
 
-    for r in repos:
-        ok, msg = _create_environment(r, env_name)
+    # Create environment for each repository
+    for repo in REPOSITORIES:
+        repo = repo.strip()
+        if not repo:
+            continue
+            
+        ok, msg = _create_environment(ORG_NAME, repo, env_name)
         if ok:
-            print(f"OK   {r.full_name}  env={env_name}")
+            print(f"OK   {ORG_NAME}/{repo}  env={env_name}")
         else:
-            print(f"FAIL {r.full_name}  env={env_name}  {msg}")
-            failures.append((r, msg))
+            print(f"FAIL {ORG_NAME}/{repo}  env={env_name}  {msg}")
+            failures.append((repo, msg))
+
+    # Update environment settings
+    for repo in REPOSITORIES:
+        reviewers = [
+            {
+                "type": "User",
+                "id": 43830269
+            }
+        ]
+        update_environment_settings(ORG_NAME, repo, ENV_NAME, wait_timer=10,reviewers=reviewers)
 
     if failures:
         print("\nSome repositories failed:")
-        for r, msg in failures:
-            print(f"- {r.full_name}: {msg}")
+        for repo, msg in failures:
+            print(f"- {ORG_NAME}/{repo}: {msg}")
         return 1
 
     return 0
