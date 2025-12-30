@@ -126,13 +126,15 @@ def update_environment_settings(
     reviewers: Optional[List[Dict[str, Any]]] = None
 ) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
     api_url = f"/repos/{owner}/{repo}/environments/{environment_name}"
-    
+
+    # API Request Body
     body = {"wait_timer": 0}
     if prevent_self_review:
         body["prevent_self_review"] = prevent_self_review
     if reviewers:
         body["reviewers"] = reviewers
-    
+
+    # API Request via GH CL
     cmd = [
         "gh", "api",
         "--method", "PUT",
@@ -143,7 +145,8 @@ def update_environment_settings(
     
     if body:
         cmd.extend(["--input", "-"])
-    
+
+    # Run as Python subprocess
     p = subprocess.run(
         cmd,
         text=True,
