@@ -125,7 +125,7 @@ def update_environment_settings(
     prevent_self_review: bool = False,
     reviewers: Optional[List[Dict[str, Any]]] = None
 ) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
-    endpoint = f"/repos/{owner}/{repo}/environments/{environment_name}"
+    api_url = f"/repos/{owner}/{repo}/environments/{environment_name}"
     
     body = {"wait_timer": 0}
     if prevent_self_review:
@@ -138,7 +138,7 @@ def update_environment_settings(
         "--method", "PUT",
         "-H", "Accept: application/vnd.github+json",
         "-H", "X-GitHub-Api-Version: 2022-11-28",
-        endpoint
+        api_url
     ]
     
     if body:
