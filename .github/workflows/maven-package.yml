@@ -1,0 +1,83 @@
+name: Maven Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment (dev, staging, production)'
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+        required: true
+        default: 'dev'
+      pom_file_path:
+        description: 'Path to the directory containing pom.xml'
+        type: string
+        required: false
+        default: 'java/my-app'
+
+jobs:
+  package:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+      
+      - name: Validate pom.xml path
+        run: |
+          POM_DIR="${{ inputs.pom_file_path }}"
+          if [ ! -f "$POM_DIR/pom.xml" ]; then
+            echo "Error: pom.xml not found at $POM_DIR/pom.xml"
+            exit 1
+          fi
+          echo "✓ Found pom.xml at $POM_DIR/pom.xml"
+      
+      - name: Build with Maven
+        run: |
+          POM_DIR="${{ inputs.pom_file_path }}"
+          cd $POM_DIR
+          mvn clean package -DskipTests=false
+      
+#      - name: Run tests
+#        run: |
+#          POM_DIR="${{ inputs.pom_file_path }}"
+#          cd $POM_DIR
+#          mvn test
+#
+      - name: Display build info
+        run: |
+          POM_DIR="${{ inputs.pom_file_path }}"
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **POM Path**: ${{ inputs.pom_file_path }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Status**: ✓ Success" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Find and list generated artifacts
+          if [ -d "$POM_DIR/target" ]; then
+            echo "### Generated Artifacts" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            ls -lh $POM_DIR/target/*.jar 2>/dev/null || echo "No JAR files found"
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+      
+#      - name: Upload artifact
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: maven-package-${{ inputs.environment }}
+#          path: ${{ inputs.pom_file_path }}/target/*.jar
+#          retention-days: 7
