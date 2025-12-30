@@ -51,12 +51,31 @@ jobs:
           cd $POM_DIR
           mvn clean package -DskipTests=false
       
-#      - name: Run tests
-#        run: |
-#          POM_DIR="${{ inputs.pom_file_path }}"
-#          cd $POM_DIR
-#          mvn test
-#
+      - name: Dev Deployment Test
+        if: ${{ inputs.environment == 'dev' }}
+        run: |
+          echo "🚀 Deploying to Dev environment"
+          echo "Environment: dev"
+          echo "Ref: $GITHUB_REF"
+          echo "Commit: $GITHUB_SHA"
+
+      - name: Staging Deployment Test
+        if: ${{ inputs.environment == 'staging' }}
+        run: |
+          echo "🚀 Deploying to Staging environment"
+          echo "Environment: staging"
+          echo "Tag: $GITHUB_REF"
+          echo "Commit: $GITHUB_SHA"
+
+      - name: Production Deployment Test
+        if: ${{ inputs.environment == 'production' }}
+        run: |
+          echo "🚀 Deploying to Production environment"
+          echo "Environment: production"
+          echo "Tag: $GITHUB_REF"
+          echo "Commit: $GITHUB_SHA"
+          echo "⚠️  This is a production deployment!"
+
       - name: Display build info
         run: |
           POM_DIR="${{ inputs.pom_file_path }}"
