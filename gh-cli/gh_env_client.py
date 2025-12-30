@@ -41,13 +41,13 @@ def _create_environment(org: str, repo: str, env_name: str) -> Tuple[bool, str]:
     endpoint = f"/repos/{org}/{repo}/environments/{env_name}"
     cmd = ["gh", "api", "-X", "PUT", endpoint]
 
-    p = subprocess.run(cmd, text=True, capture_output=True)
-    if p.returncode == 0:
-        return True, p.stdout.strip()
+    process_result = subprocess.run(cmd, text=True, capture_output=True)
+    if process_result.returncode == 0:
+        return True, process_result.stdout.strip()
 
-    err = (p.stderr or p.stdout).strip()
+    err = (process_result.stderr or process_result.stdout).strip()
     if not err:
-        err = f"gh api exited with code {p.returncode}"
+        err = f"gh api exited with code {process_result.returncode}"
     return False, err
 
 
@@ -59,17 +59,17 @@ def check_auth_status() -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
         "/user"
     ]
     
-    p = subprocess.run(cmd, text=True, capture_output=True)
-    if p.returncode == 0:
+    process_result = subprocess.run(cmd, text=True, capture_output=True)
+    if process_result.returncode == 0:
         try:
-            data = json.loads(p.stdout)
+            data = json.loads(process_result.stdout)
             return True, data, None
         except json.JSONDecodeError as e:
             return False, None, f"Failed to parse JSON: {e}"
     
-    err = (p.stderr or p.stdout).strip()
+    err = (process_result.stderr or process_result.stdout).strip()
     if not err:
-        err = f"gh api exited with code {p.returncode}"
+        err = f"gh api exited with code {process_result.returncode}"
     return False, None, err
 
 
@@ -81,17 +81,17 @@ def list_org_members(org: str) -> Tuple[bool, Optional[List[Dict[str, Any]]], Op
         f"/orgs/{org}/members"
     ]
     
-    p = subprocess.run(cmd, text=True, capture_output=True)
-    if p.returncode == 0:
+    process_result = subprocess.run(cmd, text=True, capture_output=True)
+    if process_result.returncode == 0:
         try:
-            data = json.loads(p.stdout)
+            data = json.loads(process_result.stdout)
             return True, data, None
         except json.JSONDecodeError as e:
             return False, None, f"Failed to parse JSON: {e}"
     
-    err = (p.stderr or p.stdout).strip()
+    err = (process_result.stderr or process_result.stdout).strip()
     if not err:
-        err = f"gh api exited with code {p.returncode}"
+        err = f"gh api exited with code {process_result.returncode}"
     return False, None, err
 
 
@@ -103,17 +103,17 @@ def list_org_teams(org: str) -> Tuple[bool, Optional[List[Dict[str, Any]]], Opti
         f"/orgs/{org}/teams"
     ]
     
-    p = subprocess.run(cmd, text=True, capture_output=True)
-    if p.returncode == 0:
+    process_result = subprocess.run(cmd, text=True, capture_output=True)
+    if process_result.returncode == 0:
         try:
-            data = json.loads(p.stdout)
+            data = json.loads(process_result.stdout)
             return True, data, None
         except json.JSONDecodeError as e:
             return False, None, f"Failed to parse JSON: {e}"
     
-    err = (p.stderr or p.stdout).strip()
+    err = (process_result.stderr or process_result.stdout).strip()
     if not err:
-        err = f"gh api exited with code {p.returncode}"
+        err = f"gh api exited with code {process_result.returncode}"
     return False, None, err
 
 
@@ -128,7 +128,13 @@ def update_environment_settings(
     api_url = f"/repos/{owner}/{repo}/environments/{environment_name}"
 
     # API Request Body
-    body = {"wait_timer": 0}
+    body = {
+        "wait_timer": 0,
+        "deployment_branch_policy": {
+            "protected_branches": False,
+            "custom_branch_policies": True
+        }
+    }
     if prevent_self_review:
         body["prevent_self_review"] = prevent_self_review
     if reviewers:
@@ -147,23 +153,62 @@ def update_environment_settings(
         cmd.extend(["--input", "-"])
 
     # Run as Python subprocess
-    p = subprocess.run(
+    process_result = subprocess.run(
         cmd,
         text=True,
         capture_output=True,
         input=json.dumps(body) if body else None
     )
     
-    if p.returncode == 0:
+    if process_result.returncode == 0:
         try:
-            data = json.loads(p.stdout) if p.stdout.strip() else {}
+            data = json.loads(process_result.stdout) if process_result.stdout.strip() else {}
             return True, data, None
         except json.JSONDecodeError as e:
             return False, None, f"Failed to parse JSON: {e}"
     
-    err = (p.stderr or p.stdout).strip()
+    err = (process_result.stderr or process_result.stdout).strip()
     if not err:
-        err = f"gh api exited with code {p.returncode}"
+        err = f"gh api exited with code {process_result.returncode}"
+    return False, None, err
+
+def add_custom_deployment_pattern(
+    owner: str,
+    repo: str,
+    environment_name: str,
+    pattern: str,
+    pattern_type: str = "tag"
+) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
+    api_url = f"/repos/{owner}/{repo}/environments/{environment_name}/deployment-branch-policies"
+    
+    # API Request via GH CLI using -f flags
+    cmd = [
+        "gh", "api",
+        "--method", "POST",
+        "-H", "Accept: application/vnd.github+json",
+        "-H", "X-GitHub-Api-Version: 2022-11-28",
+        api_url,
+        "-f", f"name={pattern}",
+        "-f", f"type={pattern_type}"
+    ]
+    
+    # Run as Python subprocess
+    process_result = subprocess.run(
+        cmd,
+        text=True,
+        capture_output=True
+    )
+    
+    if process_result.returncode == 0:
+        try:
+            data = json.loads(process_result.stdout) if process_result.stdout.strip() else {}
+            return True, data, None
+        except json.JSONDecodeError as e:
+            return False, None, f"Failed to parse JSON: {e}"
+    
+    err = (process_result.stderr or process_result.stdout).strip()
+    if not err:
+        err = f"gh api exited with code {process_result.returncode}"
     return False, None, err
 
 
@@ -235,6 +280,17 @@ def main() -> int:
                 print(f"UPDATED {ORG_NAME}/{repo}  env={env_name}")
             else:
                 print(f"FAIL UPDATE {ORG_NAME}/{repo}  env={env_name}  {err}")
+            
+            # Add semantic versioning tag pattern
+            ok_pattern, data_pattern, err_pattern = add_custom_deployment_pattern(
+                ORG_NAME, repo, env_name,
+                pattern="*.*.*",
+                pattern_type="tag"
+            )
+            if ok_pattern:
+                print(f"PATTERN ADDED {ORG_NAME}/{repo}  env={env_name}  pattern=*.*.*")
+            else:
+                print(f"FAIL PATTERN {ORG_NAME}/{repo}  env={env_name}  {err_pattern}")
 
     if failures:
         print("\nSome environments failed to create:")
