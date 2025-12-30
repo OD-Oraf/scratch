@@ -6,7 +6,11 @@ import sys
 from typing import Any, Dict, List, Optional, Tuple
 
 
-ENV_NAME = "staging"
+ENV_NAMES = [
+    "dev",
+    "staging",
+    "production"
+]
 
 ORG_NAME = "OD-ORAF"
 REPOSITORIES = [
@@ -123,9 +127,7 @@ def update_environment_settings(
 ) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
     endpoint = f"/repos/{owner}/{repo}/environments/{environment_name}"
     
-    body = {}
-    if wait_timer > 0:
-        body["wait_timer"] = wait_timer
+    body = {"wait_timer": 0}
     if prevent_self_review:
         body["prevent_self_review"] = prevent_self_review
     if reviewers:
@@ -163,11 +165,9 @@ def update_environment_settings(
 
 
 def main() -> int:
-    env_name = ENV_NAME.strip()
-
     # Check  ENV name and existence of GH CLI
-    if not env_name:
-        print("ERROR: ENV_NAME is empty", file=sys.stderr)
+    if not ENV_NAMES:
+        print("ERROR: ENV_NAMES is empty", file=sys.stderr)
         return 2
 
     try:
@@ -185,35 +185,58 @@ def main() -> int:
         print("ERROR: ORG_NAME is empty", file=sys.stderr)
         return 2
 
-    failures: List[Tuple[str, str]] = []
+    failures: List[Tuple[str, str, str]] = []
 
-    # Create environment for each repository
+    # Create all environments for each repository
+    for repo in REPOSITORIES:
+        repo = repo.strip()
+        if not repo:
+            continue
+        
+        for env_name in ENV_NAMES:
+            env_name = env_name.strip()
+            if not env_name:
+                continue
+                
+            ok, msg = _create_environment(ORG_NAME, repo, env_name)
+            if ok:
+                print(f"OK   {ORG_NAME}/{repo}  env={env_name}")
+            else:
+                print(f"FAIL {ORG_NAME}/{repo}  env={env_name}  {msg}")
+                failures.append((repo, env_name, msg))
+
+    # Update environment settings for all environments
+    reviewers = [
+        {
+            "type": "User",
+            "id": 43830269
+        }
+    ]
+    
     for repo in REPOSITORIES:
         repo = repo.strip()
         if not repo:
             continue
             
-        ok, msg = _create_environment(ORG_NAME, repo, env_name)
-        if ok:
-            print(f"OK   {ORG_NAME}/{repo}  env={env_name}")
-        else:
-            print(f"FAIL {ORG_NAME}/{repo}  env={env_name}  {msg}")
-            failures.append((repo, msg))
-
-    # Update environment settings
-    for repo in REPOSITORIES:
-        reviewers = [
-            {
-                "type": "User",
-                "id": 43830269
-            }
-        ]
-        update_environment_settings(ORG_NAME, repo, ENV_NAME, wait_timer=10,reviewers=reviewers)
+        for env_name in ENV_NAMES:
+            env_name = env_name.strip()
+            if not env_name:
+                continue
+                
+            ok, data, err = update_environment_settings(
+                ORG_NAME, repo, env_name, 
+                wait_timer=0,
+                reviewers=reviewers
+            )
+            if ok:
+                print(f"UPDATED {ORG_NAME}/{repo}  env={env_name}")
+            else:
+                print(f"FAIL UPDATE {ORG_NAME}/{repo}  env={env_name}  {err}")
 
     if failures:
-        print("\nSome repositories failed:")
-        for repo, msg in failures:
-            print(f"- {ORG_NAME}/{repo}: {msg}")
+        print("\nSome environments failed to create:")
+        for repo, env_name, msg in failures:
+            print(f"- {ORG_NAME}/{repo} env={env_name}: {msg}")
         return 1
 
     return 0
