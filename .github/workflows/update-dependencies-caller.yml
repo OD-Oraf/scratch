@@ -6,6 +6,11 @@ on:
     - cron: '0 9 * * 1'
   workflow_dispatch:
     inputs:
+      environment:
+        description: 'Deployment environment (dev, staging, production)'
+        type: string
+        required: false
+        default: 'dev'
       pom_file_path:
         description: 'Path to the directory containing pom.xml'
         required: false
