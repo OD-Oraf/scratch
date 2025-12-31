@@ -1,0 +1,45 @@
+name: Mulesoft Deploy - Caller
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment (dev, sit, uat, prd)'
+        type: choice
+        options:
+          - dev
+          - sit
+          - uat
+          - prd
+        required: true
+        default: 'dev'
+      pom_file_path:
+        description: 'Path to the directory containing pom.xml'
+        type: string
+        required: false
+        default: 'java/my-app'
+      tag:
+        description: 'Tag to deploy (required for uat/prd, ignored for dev/sit)'
+        type: string
+        required: false
+        default: ''
+      deploy_us:
+        description: 'Deploy to US region'
+        type: boolean
+        required: false
+        default: true
+      deploy_eu:
+        description: 'Deploy to EU region'
+        type: boolean
+        required: false
+        default: true
+
+jobs:
+  call-mulesoft-deploy:
+    uses: ./.github/workflows/maven-package.yml
+    with:
+      environment: ${{ inputs.environment }}
+      pom_file_path: ${{ inputs.pom_file_path }}
+      tag: ${{ inputs.tag }}
+      deploy_us: ${{ inputs.deploy_us }}
+      deploy_eu: ${{ inputs.deploy_eu }}

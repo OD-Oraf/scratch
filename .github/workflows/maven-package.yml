@@ -1,15 +1,11 @@
-name: Maven Package
+name: Mulesoft Deploy
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       environment:
-        description: 'Deployment environment (dev, staging, production)'
-        type: choice
-        options:
-          - dev
-          - staging
-          - production
+        description: 'Deployment environment (dev, sit, uat, prd)'
+        type: string
         required: true
         default: 'dev'
       pom_file_path:
@@ -18,17 +14,29 @@ on:
         required: false
         default: 'java/my-app'
       tag:
-        description: 'Tag to deploy (required for staging/production, ignored for dev)'
+        description: 'Tag to deploy (required for uat/prd, ignored for dev/sit)'
         type: string
         required: false
         default: ''
+      deploy_us:
+        description: 'Deploy to US region'
+        type: boolean
+        required: false
+        default: true
+      deploy_eu:
+        description: 'Deploy to EU region'
+        type: boolean
+        required: false
+        default: true
 
 jobs:
-  package:
-    permissions:
-      contents: read
+  # Job 1: Package and Push to Anypoint Exchange
+  package-and-publish:
+    name: Package & Publish to Exchange
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    outputs:
+      artifact-version: ${{ steps.extract-version.outputs.version }}
+      artifact-name: ${{ steps.extract-version.outputs.name }}
     
     steps:
       - name: Checkout repository
@@ -52,58 +60,181 @@ jobs:
           fi
           echo "✓ Found pom.xml at $POM_DIR/pom.xml"
       
+      - name: Extract artifact info
+        id: extract-version
+        run: |
+          POM_DIR="${{ inputs.pom_file_path }}"
+          VERSION=$(mvn -f $POM_DIR/pom.xml help:evaluate -Dexpression=project.version -q -DforceStdout)
+          NAME=$(mvn -f $POM_DIR/pom.xml help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "name=$NAME" >> $GITHUB_OUTPUT
+          echo "📦 Artifact: $NAME-$VERSION"
+      
       - name: Build with Maven
         run: |
           POM_DIR="${{ inputs.pom_file_path }}"
           cd $POM_DIR
+          echo "🔨 Building Mulesoft application..."
           mvn clean package -DskipTests=false
+          echo "✓ Build complete"
       
-      - name: Dev Deployment Test
-        if: ${{ inputs.environment == 'dev' }}
+      - name: Publish to Anypoint Exchange (Dry Run)
         run: |
-          echo "🚀 Deploying to Dev environment"
-          echo "Environment: dev"
-          echo "Ref: $GITHUB_REF"
-          echo "Commit: $GITHUB_SHA"
-
-      - name: Staging Deployment Test
-        if: ${{ inputs.environment == 'staging' }}
-        run: |
-          echo "🚀 Deploying to Staging environment"
-          echo "Environment: staging"
-          echo "Tag: $GITHUB_REF"
-          echo "Commit: $GITHUB_SHA"
-
-      - name: Production Deployment Test
-        if: ${{ inputs.environment == 'production' }}
-        run: |
-          echo "🚀 Deploying to Production environment"
-          echo "Environment: production"
-          echo "Tag: $GITHUB_REF"
-          echo "Commit: $GITHUB_SHA"
-          echo "⚠️  This is a production deployment!"
-
-      - name: Display build info
-        run: |
-          POM_DIR="${{ inputs.pom_file_path }}"
-          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **POM Path**: ${{ inputs.pom_file_path }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Build Status**: ✓ Success" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # Find and list generated artifacts
-          if [ -d "$POM_DIR/target" ]; then
-            echo "### Generated Artifacts" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            ls -lh $POM_DIR/target/*.jar 2>/dev/null || echo "No JAR files found"
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "═══════════════════════════════════════════════════════"
+          echo "📤 PUBLISHING TO ANYPOINT EXCHANGE (DRY RUN)"
+          echo "═══════════════════════════════════════════════════════"
+          echo ""
+          echo "Artifact: ${{ steps.extract-version.outputs.name }}"
+          echo "Version:  ${{ steps.extract-version.outputs.version }}"
+          echo "Environment: ${{ inputs.environment }}"
+          echo ""
+          echo "[DRY RUN] mvn deploy -DmuleDeploy -Danypoint.username=*** -Danypoint.password=***"
+          echo ""
+          echo "✓ Successfully published to Anypoint Exchange (simulated)"
+          sleep 2
       
-#      - name: Upload artifact
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: maven-package-${{ inputs.environment }}
-#          path: ${{ inputs.pom_file_path }}/target/*.jar
-#          retention-days: 7
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mulesoft-app-${{ steps.extract-version.outputs.version }}
+          path: ${{ inputs.pom_file_path }}/target/*.jar
+          retention-days: 5
+
+  # Job 2: Deploy to US Region
+  deploy-us:
+    name: Deploy to US Region
+    needs: package-and-publish
+    if: ${{ inputs.deploy_us }}
+    runs-on: ubuntu-latest
+    environment: us-${{ inputs.environment }}
+    
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: mulesoft-app-${{ needs.package-and-publish.outputs.artifact-version }}
+      
+      - name: Deploy to US CloudHub (Dry Run)
+        run: |
+          echo "═══════════════════════════════════════════════════════"
+          echo "🇺🇸 DEPLOYING TO US REGION (DRY RUN)"
+          echo "═══════════════════════════════════════════════════════"
+          echo ""
+          echo "Artifact: ${{ needs.package-and-publish.outputs.artifact-name }}"
+          echo "Version:  ${{ needs.package-and-publish.outputs.artifact-version }}"
+          echo "Region:   US"
+          echo "Environment: us-${{ inputs.environment }}"
+          echo "CloudHub Worker: us-east-1"
+          echo ""
+          echo "[DRY RUN] anypoint-cli runtime-mgr cloudhub-application deploy"
+          echo "         --environment ${{ inputs.environment }}"
+          echo "         --region us-east-1"
+          echo "         --workers 1"
+          echo "         --workerSize 0.1"
+          echo ""
+          echo "⏳ Simulating deployment..."
+          sleep 3
+          echo "✓ Application deployed to US CloudHub (simulated)"
+      
+      - name: Verify US Deployment (Dry Run)
+        run: |
+          echo "🔍 Verifying US deployment..."
+          echo "[DRY RUN] Checking application status..."
+          sleep 2
+          echo "✓ Application status: STARTED"
+          echo "✓ Health check: PASSED"
+
+  # Job 3: Deploy to EU Region
+  deploy-eu:
+    name: Deploy to EU Region
+    needs: package-and-publish
+    if: ${{ inputs.deploy_eu }}
+    runs-on: ubuntu-latest
+    environment: eu-${{ inputs.environment }}
+    
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: mulesoft-app-${{ needs.package-and-publish.outputs.artifact-version }}
+      
+      - name: Deploy to EU CloudHub (Dry Run)
+        run: |
+          echo "═══════════════════════════════════════════════════════"
+          echo "🇪🇺 DEPLOYING TO EU REGION (DRY RUN)"
+          echo "═══════════════════════════════════════════════════════"
+          echo ""
+          echo "Artifact: ${{ needs.package-and-publish.outputs.artifact-name }}"
+          echo "Version:  ${{ needs.package-and-publish.outputs.artifact-version }}"
+          echo "Region:   EU"
+          echo "Environment: eu-${{ inputs.environment }}"
+          echo "CloudHub Worker: eu-west-1"
+          echo ""
+          echo "[DRY RUN] anypoint-cli runtime-mgr cloudhub-application deploy"
+          echo "         --environment ${{ inputs.environment }}"
+          echo "         --region eu-west-1"
+          echo "         --workers 1"
+          echo "         --workerSize 0.1"
+          echo ""
+          echo "⏳ Simulating deployment..."
+          sleep 3
+          echo "✓ Application deployed to EU CloudHub (simulated)"
+      
+      - name: Verify EU Deployment (Dry Run)
+        run: |
+          echo "🔍 Verifying EU deployment..."
+          echo "[DRY RUN] Checking application status..."
+          sleep 2
+          echo "✓ Application status: STARTED"
+          echo "✓ Health check: PASSED"
+
+  # Job 4: Backup to Nexus
+  backup-to-nexus:
+    name: Backup to Nexus
+    needs: [package-and-publish, deploy-us, deploy-eu]
+    if: ${{ always() && needs.package-and-publish.result == 'success' }}
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: mulesoft-app-${{ needs.package-and-publish.outputs.artifact-version }}
+      
+      - name: Backup to Nexus Repository (Dry Run)
+        run: |
+          echo "═══════════════════════════════════════════════════════"
+          echo "📦 BACKING UP TO NEXUS REPOSITORY (DRY RUN)"
+          echo "═══════════════════════════════════════════════════════"
+          echo ""
+          echo "Artifact: ${{ needs.package-and-publish.outputs.artifact-name }}"
+          echo "Version:  ${{ needs.package-and-publish.outputs.artifact-version }}"
+          echo "Repository: releases"
+          echo "Nexus URL: https://nexus.example.com/repository/maven-releases/"
+          echo ""
+          echo "[DRY RUN] curl -v -u admin:*** --upload-file"
+          echo "         ${{ needs.package-and-publish.outputs.artifact-name }}-${{ needs.package-and-publish.outputs.artifact-version }}.jar"
+          echo "         https://nexus.example.com/repository/maven-releases/..."
+          echo ""
+          echo "⏳ Simulating upload..."
+          sleep 2
+          echo "✓ Artifact backed up to Nexus (simulated)"
+      
+      - name: Generate Deployment Summary
+        run: |
+          echo "## 🚀 Mulesoft Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Artifact** | ${{ needs.package-and-publish.outputs.artifact-name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Version** | ${{ needs.package-and-publish.outputs.artifact-version }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Environment** | ${{ inputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **US Deployment** | ${{ needs.deploy-us.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **EU Deployment** | ${{ needs.deploy-eu.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Nexus Backup** | ✓ Complete |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployment Locations" >> $GITHUB_STEP_SUMMARY
+          echo "- 📤 Anypoint Exchange" >> $GITHUB_STEP_SUMMARY
+          echo "- 🇺🇸 US CloudHub (us-east-1)" >> $GITHUB_STEP_SUMMARY
+          echo "- 🇪🇺 EU CloudHub (eu-west-1)" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 Nexus Repository" >> $GITHUB_STEP_SUMMARY
