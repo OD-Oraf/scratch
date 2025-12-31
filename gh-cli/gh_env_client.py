@@ -17,6 +17,15 @@ REPOSITORIES = [
     "scratch"
 ]
 
+ENV_REVIEWERS = {
+    "dev": [],  # No reviewers for dev
+    "staging": [{"type": "User", "id": 43830269}],
+    "production": [
+        {"type": "User", "id": 43830269},
+        {"type": "Team", "id": 12345}  # Add more for prod
+    ]
+}
+
 #############################
 # Functions                #
 #############################
@@ -259,12 +268,7 @@ def main() -> int:
                 failures.append((repo, env_name, msg))
 
     # Update environment settings for all environments
-    reviewers = [
-        {
-            "type": "User",
-            "id": 43830269
-        }
-    ]
+    reviewers = ENV_REVIEWERS.get(env_name, [])
     
     for repo in REPOSITORIES:
         repo = repo.strip()
