@@ -17,9 +17,9 @@ REPOSITORIES = [
     "scratch"
 ]
 
-
-
-
+#############################
+# Functions                #
+#############################
 def _ensure_gh_available() -> None:
     try:
         subprocess.run(["gh", "--version"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -210,6 +210,11 @@ def add_custom_deployment_pattern(
     if not err:
         err = f"gh api exited with code {process_result.returncode}"
     return False, None, err
+
+
+#############################
+# Main Method           #
+#############################
 
 
 def main() -> int:
