@@ -161,6 +161,10 @@ def update_environment_settings(
     if body:
         cmd.extend(["--input", "-"])
 
+    # Debug logging
+    print(f"[CMD] {' '.join(cmd)}")
+    print(f"[BODY] {json.dumps(body, indent=2)}")
+
     # Run as Python subprocess
     process_result = subprocess.run(
         cmd,
@@ -168,6 +172,12 @@ def update_environment_settings(
         capture_output=True,
         input=json.dumps(body) if body else None
     )
+    
+    # Log output
+    if process_result.stdout:
+        print(f"[OUT] {process_result.stdout}")
+    if process_result.stderr:
+        print(f"[ERR] {process_result.stderr}")
     
     if process_result.returncode == 0:
         try:
