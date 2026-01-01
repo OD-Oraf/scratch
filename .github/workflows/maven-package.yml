@@ -1,4 +1,4 @@
-name: Mulesoft Deploy
+name: Mulesoft RTF Deploy Mock
 
 on:
   workflow_call:
