@@ -49,8 +49,15 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: 'maven'
-      
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles(format('{0}/pom.xml', inputs.pom_file_path)) }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
       - name: Validate pom.xml path
         run: |
           POM_DIR="${{ inputs.pom_file_path }}"
@@ -93,12 +100,12 @@ jobs:
           echo "✓ Successfully published to Anypoint Exchange (simulated)"
           sleep 2
       
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: mulesoft-app-${{ steps.extract-version.outputs.version }}
-          path: ${{ inputs.pom_file_path }}/target/*.jar
-          retention-days: 5
+#      - name: Upload build artifact
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: mulesoft-app-${{ steps.extract-version.outputs.version }}
+#          path: ${{ inputs.pom_file_path }}/target/*.jar
+#          retention-days: 5
 
   # Job 2: Deploy to US Region
   deploy-us:
@@ -196,10 +203,10 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: mulesoft-app-${{ needs.package-and-publish.outputs.artifact-version }}
+#      - name: Download artifact
+#        uses: actions/download-artifact@v4
+#        with:
+#          name: mulesoft-app-${{ needs.package-and-publish.outputs.artifact-version }}
       
       - name: Backup to Nexus Repository (Dry Run)
         run: |
