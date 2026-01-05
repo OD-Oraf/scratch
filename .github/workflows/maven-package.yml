@@ -264,7 +264,7 @@ jobs:
           echo "🏷️  CREATING RELEASE TAG"
           echo "═══════════════════════════════════════════════════════"
           echo ""
-          echo "Version: $VERSION"
+          echo "Version (from pom.xml): $VERSION"
           echo "Tag: $TAG_NAME"
           echo ""
           
