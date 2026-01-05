@@ -36,6 +36,8 @@ on:
 
 jobs:
   call-mulesoft-deploy:
+    permissions:
+      contents: write
     uses: ./.github/workflows/maven-package.yml
     with:
       environment: ${{ inputs.environment }}
@@ -43,3 +45,4 @@ jobs:
       tag: ${{ inputs.tag }}
       deploy_us: ${{ inputs.deploy_us }}
       deploy_eu: ${{ inputs.deploy_eu }}
+    secrets: inherit
