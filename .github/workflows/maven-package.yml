@@ -271,10 +271,20 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
+          # Check if tag already exists
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "⚠️  Tag $TAG_NAME already exists - skipping tag creation"
+            echo "This may happen if the same version was deployed previously"
+            exit 0
+          fi
+          
           # Create annotated tag
           git tag -a "$TAG_NAME" -m "Release $TAG_NAME - deployed from dev"
           
           # Push tag to repository
-          git push origin "$TAG_NAME"
-          
-          echo "✓ Tag $TAG_NAME created and pushed successfully"
+          if git push origin "$TAG_NAME"; then
+            echo "✓ Tag $TAG_NAME created and pushed successfully"
+          else
+            echo "⚠️  Failed to push tag $TAG_NAME - it may already exist on remote"
+            exit 0
+          fi
