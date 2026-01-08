@@ -1,5 +1,7 @@
 name: Mulesoft RTF Deploy(Mock)
 
+run-name: "Deploy ${{ inputs.environment }}${{ inputs.tag && format(' v{0}', inputs.tag) || '' }} [${{ inputs.deploy_us && inputs.deploy_eu && 'US+EU' || inputs.deploy_us && 'US' || inputs.deploy_eu && 'EU' || 'None' }}]"
+
 on:
   workflow_dispatch:
     inputs:
