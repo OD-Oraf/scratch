@@ -288,3 +288,100 @@ jobs:
             echo "⚠️  Failed to push tag $TAG_NAME - it may already exist on remote"
             exit 0
           fi
+
+  # Job 6: Production Release (Prd only)
+  production-release:
+    name: Production Release
+    needs: [package-and-publish, deploy-us, deploy-eu]
+    if: ${{ always() && inputs.environment == 'prd' && needs.package-and-publish.result == 'success' && (needs.deploy-us.result == 'success' || needs.deploy-eu.result == 'success') }}
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+      
+      - name: Create production release tag
+        run: |
+          VERSION="${{ needs.package-and-publish.outputs.artifact-version }}"
+          PROD_TAG="release-${VERSION}"
+          
+          echo "═══════════════════════════════════════════════════════"
+          echo "🚀 CREATING PRODUCTION RELEASE TAG"
+          echo "═══════════════════════════════════════════════════════"
+          echo ""
+          echo "Version (from pom.xml): $VERSION"
+          echo "Production Tag: $PROD_TAG"
+          echo ""
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Check if tag already exists
+          if git rev-parse "$PROD_TAG" >/dev/null 2>&1; then
+            echo "⚠️  Tag $PROD_TAG already exists - skipping tag creation"
+            exit 0
+          fi
+          
+          # Create annotated production tag
+          git tag -a "$PROD_TAG" -m "Production Release $VERSION - deployed to prd"
+          
+          # Push tag to repository
+          if git push origin "$PROD_TAG"; then
+            echo "✓ Production tag $PROD_TAG created and pushed successfully"
+          else
+            echo "⚠️  Failed to push tag $PROD_TAG - it may already exist on remote"
+          fi
+      
+      - name: Merge to master branch
+        run: |
+          VERSION="${{ needs.package-and-publish.outputs.artifact-version }}"
+          SOURCE_TAG="${{ inputs.tag }}"
+          
+          echo "═══════════════════════════════════════════════════════"
+          echo "🔀 MERGING TO MASTER BRANCH"
+          echo "═══════════════════════════════════════════════════════"
+          echo ""
+          echo "Source Tag: $SOURCE_TAG"
+          echo "Target Branch: master"
+          echo ""
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Fetch all branches
+          git fetch origin master:master || git fetch origin main:main || true
+          
+          # Determine the main branch name (master or main)
+          if git show-ref --verify --quiet refs/heads/master; then
+            MAIN_BRANCH="master"
+          elif git show-ref --verify --quiet refs/heads/main; then
+            MAIN_BRANCH="main"
+          else
+            echo "⚠️  Could not find master or main branch"
+            exit 0
+          fi
+          
+          echo "Using branch: $MAIN_BRANCH"
+          
+          # Checkout main branch
+          git checkout "$MAIN_BRANCH"
+          
+          # Merge the tag into main branch
+          if git merge "$SOURCE_TAG" -m "Merge production release $VERSION into $MAIN_BRANCH"; then
+            echo "✓ Successfully merged $SOURCE_TAG into $MAIN_BRANCH"
+            
+            # Push the merge
+            if git push origin "$MAIN_BRANCH"; then
+              echo "✓ Successfully pushed merge to $MAIN_BRANCH"
+            else
+              echo "⚠️  Failed to push merge to $MAIN_BRANCH"
+              exit 0
+            fi
+          else
+            echo "⚠️  Merge conflict or error - manual intervention may be required"
+            git merge --abort || true
+            exit 0
+          fi
