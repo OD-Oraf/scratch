@@ -260,5 +260,5 @@ jobs:
       artifact_version: ${{ needs.package-and-publish.outputs.artifact-version }}
       artifact_name: ${{ needs.package-and-publish.outputs.artifact-name }}
       source_ref: ${{ inputs.environment == 'prd' && inputs.tag || inputs.branch }}
-      tag_prefix: ${{ inputs.environment == 'prd' && 'PRD' || '' }}
+      use_prod_prefix: ${{ inputs.environment == 'prd' }}
       merge_to_main: ${{ inputs.environment == 'prd' }}

@@ -19,9 +19,9 @@ on:
         description: 'Source branch or tag to checkout'
         type: string
         required: true
-      tag_prefix:
-        description: 'Prefix for production tags (e.g., PRD, RELEASE)'
-        type: string
+      use_prod_prefix:
+        description: 'Whether to prefix tag with PRD- (true=PRD-version, false=version only)'
+        type: boolean
         required: true
       merge_to_main:
         description: 'Whether to merge to main branch on production release'
@@ -99,7 +99,11 @@ jobs:
       - name: Create production release tag
         run: |
           VERSION="${{ inputs.artifact_version }}"
-          PROD_TAG="${{ inputs.tag_prefix }}-${VERSION}"
+          if [ "${{ inputs.use_prod_prefix }}" == "true" ]; then
+            PROD_TAG="PRD-${VERSION}"
+          else
+            PROD_TAG="${VERSION}"
+          fi
           ORG_CONTEXT="${{ inputs.org_name && format(' [{0}]', inputs.org_name) || '' }}"
           
           echo "═══════════════════════════════════════════════════════"
