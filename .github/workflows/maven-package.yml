@@ -203,190 +203,24 @@ jobs:
     name: Backup to Nexus
     needs: [package-and-publish, deploy-us, deploy-eu]
     if: ${{ always() && needs.package-and-publish.result == 'success' && !(inputs.environment == 'dev' && startsWith(inputs.branch, 'feature-')) }}
-    runs-on: ubuntu-latest
-    
-    steps:
-#      - name: Download artifact
-#        uses: actions/download-artifact@v4
-#        with:
-#          name: mulesoft-app-${{ needs.package-and-publish.outputs.artifact-version }}
-      
-      - name: Backup to Nexus Repository (Dry Run)
-        run: |
-          echo "═══════════════════════════════════════════════════════"
-          echo "📦 BACKING UP TO NEXUS REPOSITORY (DRY RUN)"
-          echo "═══════════════════════════════════════════════════════"
-          echo ""
-          echo "Artifact: ${{ needs.package-and-publish.outputs.artifact-name }}"
-          echo "Version:  ${{ needs.package-and-publish.outputs.artifact-version }}"
-          echo "Repository: releases"
-          echo "Nexus URL: https://nexus.example.com/repository/maven-releases/"
-          echo ""
-          echo "[DRY RUN] curl -v -u admin:*** --upload-file"
-          echo "         ${{ needs.package-and-publish.outputs.artifact-name }}-${{ needs.package-and-publish.outputs.artifact-version }}.jar"
-          echo "         https://nexus.example.com/repository/maven-releases/..."
-          echo ""
-          echo "⏳ Simulating upload..."
-          sleep 2
-          echo "✓ Artifact backed up to Nexus (simulated)"
-      
-      - name: Generate Deployment Summary
-        run: |
-          echo "## 🚀 Mulesoft Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Artifact** | ${{ needs.package-and-publish.outputs.artifact-name }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Version** | ${{ needs.package-and-publish.outputs.artifact-version }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Environment** | ${{ inputs.environment }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **US Deployment** | ${{ needs.deploy-us.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **EU Deployment** | ${{ needs.deploy-eu.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Nexus Backup** | ✓ Complete |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Deployment Locations" >> $GITHUB_STEP_SUMMARY
-          echo "- 📤 Anypoint Exchange" >> $GITHUB_STEP_SUMMARY
-          echo "- 🇺🇸 US CloudHub (us-east-1)" >> $GITHUB_STEP_SUMMARY
-          echo "- 🇪🇺 EU CloudHub (eu-west-1)" >> $GITHUB_STEP_SUMMARY
-          echo "- 📦 Nexus Repository" >> $GITHUB_STEP_SUMMARY
+    uses: ./.github/workflows/nexus-backup.yml
+    with:
+      artifact_name: ${{ needs.package-and-publish.outputs.artifact-name }}
+      artifact_version: ${{ needs.package-and-publish.outputs.artifact-version }}
+      environment: ${{ inputs.environment }}
+      us_deployment_result: ${{ needs.deploy-us.result || 'skipped' }}
+      eu_deployment_result: ${{ needs.deploy-eu.result || 'skipped' }}
 
-  # Job 5: Tag Release (Dev only, skip for feature branches)
+  # Job 5: Tag Release (Dev and Prd only, skip for feature branches in dev)
   tag-release:
     name: Tag Release
     needs: [package-and-publish, deploy-us, deploy-eu]
-    if: ${{ always() && inputs.environment == 'dev' && !startsWith(inputs.branch, 'feature-') && needs.package-and-publish.result == 'success' && (needs.deploy-us.result == 'success' || needs.deploy-eu.result == 'success') }}
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      
-      - name: Create and push tag
-        run: |
-          VERSION="${{ needs.package-and-publish.outputs.artifact-version }}"
-          TAG_NAME="${VERSION}"
-          
-          echo "═══════════════════════════════════════════════════════"
-          echo "🏷️  CREATING RELEASE TAG"
-          echo "═══════════════════════════════════════════════════════"
-          echo ""
-          echo "Version (from pom.xml): $VERSION"
-          echo "Tag: $TAG_NAME"
-          echo ""
-          
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Check if tag already exists
-          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-            echo "⚠️  Tag $TAG_NAME already exists - skipping tag creation"
-            echo "This may happen if the same version was deployed previously"
-            exit 0
-          fi
-          
-          # Create annotated tag
-          git tag -a "$TAG_NAME" -m "Release $TAG_NAME - deployed from dev"
-          
-          # Push tag to repository
-          if git push origin "$TAG_NAME"; then
-            echo "✓ Tag $TAG_NAME created and pushed successfully"
-          else
-            echo "⚠️  Failed to push tag $TAG_NAME - it may already exist on remote"
-            exit 0
-          fi
-
-  # Job 6: Production Release (Prd only)
-  production-release:
-    name: Production Release
-    needs: [package-and-publish, deploy-us, deploy-eu]
-    if: ${{ always() && inputs.environment == 'prd' && needs.package-and-publish.result == 'success' && (needs.deploy-us.result == 'success' || needs.deploy-eu.result == 'success') }}
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.tag }}
-          fetch-depth: 0
-      
-      - name: Create production release tag
-        run: |
-          VERSION="${{ needs.package-and-publish.outputs.artifact-version }}"
-          PROD_TAG="PRD-${VERSION}"
-          
-          echo "═══════════════════════════════════════════════════════"
-          echo "🚀 CREATING PRODUCTION RELEASE TAG"
-          echo "═══════════════════════════════════════════════════════"
-          echo ""
-          echo "Version (from pom.xml): $VERSION"
-          echo "Production Tag: $PROD_TAG"
-          echo ""
-          
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Check if tag already exists
-          if git rev-parse "$PROD_TAG" >/dev/null 2>&1; then
-            echo "⚠️  Tag $PROD_TAG already exists - skipping tag creation"
-            exit 0
-          fi
-          
-          # Create annotated production tag
-          git tag -a "$PROD_TAG" -m "Production Release $VERSION - deployed to prd"
-          
-          # Push tag to repository
-          if git push origin "$PROD_TAG"; then
-            echo "✓ Production tag $PROD_TAG created and pushed successfully"
-          else
-            echo "⚠️  Failed to push tag $PROD_TAG - it may already exist on remote"
-          fi
-      
-      - name: Merge to master branch
-        run: |
-          VERSION="${{ needs.package-and-publish.outputs.artifact-version }}"
-          SOURCE_TAG="${{ inputs.tag }}"
-          
-          echo "═══════════════════════════════════════════════════════"
-          echo "🔀 MERGING TO MASTER BRANCH"
-          echo "═══════════════════════════════════════════════════════"
-          echo ""
-          echo "Source Tag: $SOURCE_TAG"
-          echo "Target Branch: master"
-          echo ""
-          
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Fetch all branches
-          git fetch origin master:master || git fetch origin main:main || true
-          
-          # Determine the main branch name (master or main)
-          if git show-ref --verify --quiet refs/heads/master; then
-            MAIN_BRANCH="master"
-          elif git show-ref --verify --quiet refs/heads/main; then
-            MAIN_BRANCH="main"
-          else
-            echo "⚠️  Could not find master or main branch"
-            exit 0
-          fi
-          
-          echo "Using branch: $MAIN_BRANCH"
-          
-          # Checkout main branch
-          git checkout "$MAIN_BRANCH"
-          
-          # Merge the tag into main branch
-          if git merge "$SOURCE_TAG" -m "Merge production release $VERSION into $MAIN_BRANCH"; then
-            echo "✓ Successfully merged $SOURCE_TAG into $MAIN_BRANCH"
-            
-            # Push the merge
-            if git push origin "$MAIN_BRANCH"; then
-              echo "✓ Successfully pushed merge to $MAIN_BRANCH"
-            else
-              echo "⚠️  Failed to push merge to $MAIN_BRANCH"
-              exit 0
-            fi
-          else
-            echo "⚠️  Merge conflict or error - manual intervention may be required"
-            git merge --abort || true
-            exit 0
-          fi
+    if: ${{ always() && (inputs.environment == 'dev' || inputs.environment == 'prd') && !(inputs.environment == 'dev' && startsWith(inputs.branch, 'feature-')) && needs.package-and-publish.result == 'success' && (needs.deploy-us.result == 'success' || needs.deploy-eu.result == 'success') }}
+    uses: ./.github/workflows/release-management.yml
+    with:
+      release_type: ${{ inputs.environment == 'prd' && 'production' || 'dev' }}
+      artifact_version: ${{ needs.package-and-publish.outputs.artifact-version }}
+      artifact_name: ${{ needs.package-and-publish.outputs.artifact-name }}
+      source_ref: ${{ inputs.environment == 'prd' && inputs.tag || inputs.branch }}
+      use_prod_prefix: ${{ inputs.environment == 'prd' }}
+      merge_to_main: ${{ inputs.environment == 'prd' }}
