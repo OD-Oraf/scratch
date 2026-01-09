@@ -203,51 +203,13 @@ jobs:
     name: Backup to Nexus
     needs: [package-and-publish, deploy-us, deploy-eu]
     if: ${{ always() && needs.package-and-publish.result == 'success' && !(inputs.environment == 'dev' && startsWith(inputs.branch, 'feature-')) }}
-    runs-on: ubuntu-latest
-    
-    steps:
-#      - name: Download artifact
-#        uses: actions/download-artifact@v4
-#        with:
-#          name: mulesoft-app-${{ needs.package-and-publish.outputs.artifact-version }}
-      
-      - name: Backup to Nexus Repository (Dry Run)
-        run: |
-          echo "═══════════════════════════════════════════════════════"
-          echo "📦 BACKING UP TO NEXUS REPOSITORY (DRY RUN)"
-          echo "═══════════════════════════════════════════════════════"
-          echo ""
-          echo "Artifact: ${{ needs.package-and-publish.outputs.artifact-name }}"
-          echo "Version:  ${{ needs.package-and-publish.outputs.artifact-version }}"
-          echo "Repository: releases"
-          echo "Nexus URL: https://nexus.example.com/repository/maven-releases/"
-          echo ""
-          echo "[DRY RUN] curl -v -u admin:*** --upload-file"
-          echo "         ${{ needs.package-and-publish.outputs.artifact-name }}-${{ needs.package-and-publish.outputs.artifact-version }}.jar"
-          echo "         https://nexus.example.com/repository/maven-releases/..."
-          echo ""
-          echo "⏳ Simulating upload..."
-          sleep 2
-          echo "✓ Artifact backed up to Nexus (simulated)"
-      
-      - name: Generate Deployment Summary
-        run: |
-          echo "## 🚀 Mulesoft Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Artifact** | ${{ needs.package-and-publish.outputs.artifact-name }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Version** | ${{ needs.package-and-publish.outputs.artifact-version }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Environment** | ${{ inputs.environment }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **US Deployment** | ${{ needs.deploy-us.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **EU Deployment** | ${{ needs.deploy-eu.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Nexus Backup** | ✓ Complete |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Deployment Locations" >> $GITHUB_STEP_SUMMARY
-          echo "- 📤 Anypoint Exchange" >> $GITHUB_STEP_SUMMARY
-          echo "- 🇺🇸 US CloudHub (us-east-1)" >> $GITHUB_STEP_SUMMARY
-          echo "- 🇪🇺 EU CloudHub (eu-west-1)" >> $GITHUB_STEP_SUMMARY
-          echo "- 📦 Nexus Repository" >> $GITHUB_STEP_SUMMARY
+    uses: ./.github/workflows/nexus-backup.yml
+    with:
+      artifact_name: ${{ needs.package-and-publish.outputs.artifact-name }}
+      artifact_version: ${{ needs.package-and-publish.outputs.artifact-version }}
+      environment: ${{ inputs.environment }}
+      us_deployment_result: ${{ needs.deploy-us.result || 'skipped' }}
+      eu_deployment_result: ${{ needs.deploy-eu.result || 'skipped' }}
 
   # Job 5: Tag Release (Dev and Prd only, skip for feature branches in dev)
   tag-release:

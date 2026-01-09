@@ -1,0 +1,83 @@
+name: Nexus Backup
+
+on:
+  workflow_call:
+    inputs:
+      artifact_name:
+        description: 'Artifact name from pom.xml'
+        type: string
+        required: true
+      artifact_version:
+        description: 'Version from pom.xml'
+        type: string
+        required: true
+      environment:
+        description: 'Deployment environment'
+        type: string
+        required: true
+      us_deployment_result:
+        description: 'Result of US deployment (success, failure, skipped)'
+        type: string
+        required: true
+      eu_deployment_result:
+        description: 'Result of EU deployment (success, failure, skipped)'
+        type: string
+        required: true
+      org_name:
+        description: 'Organization name for context'
+        type: string
+        required: false
+        default: ''
+
+jobs:
+  backup:
+    name: Backup to Nexus
+    runs-on: ubuntu-latest
+    
+    steps:
+#      - name: Download artifact
+#        uses: actions/download-artifact@v4
+#        with:
+#          name: mulesoft-app-${{ inputs.artifact_version }}
+      
+      - name: Backup to Nexus Repository (Dry Run)
+        run: |
+          ORG_CONTEXT="${{ inputs.org_name && format(' [{0}]', inputs.org_name) || '' }}"
+          
+          echo "═══════════════════════════════════════════════════════"
+          echo "📦 BACKING UP TO NEXUS REPOSITORY (DRY RUN)${ORG_CONTEXT}"
+          echo "═══════════════════════════════════════════════════════"
+          echo ""
+          echo "Artifact: ${{ inputs.artifact_name }}"
+          echo "Version:  ${{ inputs.artifact_version }}"
+          echo "Repository: releases"
+          echo "Nexus URL: https://nexus.example.com/repository/maven-releases/"
+          echo ""
+          echo "[DRY RUN] curl -v -u admin:*** --upload-file"
+          echo "         ${{ inputs.artifact_name }}-${{ inputs.artifact_version }}.jar"
+          echo "         https://nexus.example.com/repository/maven-releases/..."
+          echo ""
+          echo "⏳ Simulating upload..."
+          sleep 2
+          echo "✓ Artifact backed up to Nexus (simulated)"
+      
+      - name: Generate Deployment Summary
+        run: |
+          ORG_CONTEXT="${{ inputs.org_name && format(' [{0}]', inputs.org_name) || '' }}"
+          
+          echo "## 🚀 Mulesoft Deployment Summary${ORG_CONTEXT}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Artifact** | ${{ inputs.artifact_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Version** | ${{ inputs.artifact_version }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Environment** | ${{ inputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **US Deployment** | ${{ inputs.us_deployment_result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **EU Deployment** | ${{ inputs.eu_deployment_result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Nexus Backup** | ✓ Complete |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployment Locations" >> $GITHUB_STEP_SUMMARY
+          echo "- 📤 Anypoint Exchange" >> $GITHUB_STEP_SUMMARY
+          echo "- 🇺🇸 US CloudHub (us-east-1)" >> $GITHUB_STEP_SUMMARY
+          echo "- 🇪🇺 EU CloudHub (eu-west-1)" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 Nexus Repository" >> $GITHUB_STEP_SUMMARY
