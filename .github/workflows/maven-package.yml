@@ -202,7 +202,7 @@ jobs:
   backup-to-nexus:
     name: Backup to Nexus
     needs: [package-and-publish, deploy-us, deploy-eu]
-    if: ${{ always() && needs.package-and-publish.result == 'success' && !(inputs.environment == 'dev' && startsWith(inputs.branch, 'feature-')) }}
+    if: ${{ always() && needs.package-and-publish.result == 'success' && inputs.environment == 'dev' && inputs.branch == 'develop'}}
     uses: ./.github/workflows/nexus-backup.yml
     with:
       artifact_name: ${{ needs.package-and-publish.outputs.artifact-name }}
