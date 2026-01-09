@@ -306,7 +306,7 @@ jobs:
       - name: Create production release tag
         run: |
           VERSION="${{ needs.package-and-publish.outputs.artifact-version }}"
-          PROD_TAG="release-${VERSION}"
+          PROD_TAG="PRD-${VERSION}"
           
           echo "═══════════════════════════════════════════════════════"
           echo "🚀 CREATING PRODUCTION RELEASE TAG"
