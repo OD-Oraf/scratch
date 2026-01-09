@@ -19,20 +19,11 @@ on:
         description: 'Source branch or tag to checkout'
         type: string
         required: true
-      use_prod_prefix:
-        description: 'Whether to prefix tag with PRD- (true=PRD-version, false=version only)'
-        type: boolean
-        required: true
       merge_to_main:
         description: 'Whether to merge to main branch on production release'
         type: boolean
         required: false
         default: true
-      org_name:
-        description: 'Organization name for tagging context'
-        type: string
-        required: false
-        default: ''
 
 jobs:
   # Dev Release: Create version tag
@@ -51,10 +42,9 @@ jobs:
         run: |
           VERSION="${{ inputs.artifact_version }}"
           TAG_NAME="${VERSION}"
-          ORG_CONTEXT="${{ inputs.org_name && format(' [{0}]', inputs.org_name) || '' }}"
           
           echo "═══════════════════════════════════════════════════════"
-          echo "🏷️  CREATING RELEASE TAG${ORG_CONTEXT}"
+          echo "🏷️  CREATING RELEASE TAG"
           echo "═══════════════════════════════════════════════════════"
           echo ""
           echo "Artifact: ${{ inputs.artifact_name }}"
@@ -73,7 +63,7 @@ jobs:
           fi
           
           # Create annotated tag
-          git tag -a "$TAG_NAME" -m "Release $TAG_NAME - deployed from dev${ORG_CONTEXT}"
+          git tag -a "$TAG_NAME" -m "Release $TAG_NAME - deployed from dev"
           
           # Push tag to repository
           if git push origin "$TAG_NAME"; then
@@ -99,15 +89,10 @@ jobs:
       - name: Create production release tag
         run: |
           VERSION="${{ inputs.artifact_version }}"
-          if [ "${{ inputs.use_prod_prefix }}" == "true" ]; then
-            PROD_TAG="PRD-${VERSION}"
-          else
-            PROD_TAG="${VERSION}"
-          fi
-          ORG_CONTEXT="${{ inputs.org_name && format(' [{0}]', inputs.org_name) || '' }}"
+          PROD_TAG="PRD-${VERSION}"
           
           echo "═══════════════════════════════════════════════════════"
-          echo "🚀 CREATING PRODUCTION RELEASE TAG${ORG_CONTEXT}"
+          echo "🚀 CREATING PRODUCTION RELEASE TAG"
           echo "═══════════════════════════════════════════════════════"
           echo ""
           echo "Artifact: ${{ inputs.artifact_name }}"
@@ -125,7 +110,7 @@ jobs:
           fi
           
           # Create annotated production tag
-          git tag -a "$PROD_TAG" -m "Production Release $VERSION - deployed to prd${ORG_CONTEXT}"
+          git tag -a "$PROD_TAG" -m "Production Release $VERSION - deployed to prd"
           
           # Push tag to repository
           if git push origin "$PROD_TAG"; then
@@ -139,10 +124,9 @@ jobs:
         run: |
           VERSION="${{ inputs.artifact_version }}"
           SOURCE_REF="${{ inputs.source_ref }}"
-          ORG_CONTEXT="${{ inputs.org_name && format(' [{0}]', inputs.org_name) || '' }}"
           
           echo "═══════════════════════════════════════════════════════"
-          echo "🔀 MERGING TO MASTER BRANCH${ORG_CONTEXT}"
+          echo "🔀 MERGING TO MASTER BRANCH"
           echo "═══════════════════════════════════════════════════════"
           echo ""
           echo "Source: $SOURCE_REF"
