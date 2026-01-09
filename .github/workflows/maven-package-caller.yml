@@ -1,6 +1,6 @@
 name: Mulesoft RTF Deploy(Mock)
 
-run-name: "Deploy ${{ inputs.environment }}${{ inputs.tag && format(' v{0}', inputs.tag) || '' }} [${{ inputs.deploy_us && inputs.deploy_eu && 'US+EU' || inputs.deploy_us && 'US' || inputs.deploy_eu && 'EU' || 'None' }}]"
+run-name: "Deploy ${{ inputs.environment }}${{ inputs.environment == 'dev' && format(' ({0})', inputs.branch) || format(' v{0}', inputs.tag) }} [${{ inputs.deploy_us && inputs.deploy_eu && 'US+EU' || inputs.deploy_us && 'US' || inputs.deploy_eu && 'EU' || 'None' }}]"
 
 on:
   workflow_dispatch:
@@ -20,8 +20,13 @@ on:
         type: string
         required: false
         default: 'java/my-app'
+      branch:
+        description: 'Branch to deploy (dev only, feature-* branches skip tagging)'
+        type: string
+        required: false
+        default: 'develop'
       tag:
-        description: 'Tag to deploy (required for uat/prd, ignored for dev/sit)'
+        description: 'Tag to deploy (required for sit/uat/prd)'
         type: string
         required: false
         default: ''
@@ -44,6 +49,7 @@ jobs:
     with:
       environment: ${{ inputs.environment }}
       pom_file_path: ${{ inputs.pom_file_path }}
+      branch: ${{ inputs.branch }}
       tag: ${{ inputs.tag }}
       deploy_us: ${{ inputs.deploy_us }}
       deploy_eu: ${{ inputs.deploy_eu }}
