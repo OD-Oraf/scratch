@@ -216,7 +216,7 @@ jobs:
     name: Tag Release
     needs: [package-and-publish, deploy-us, deploy-eu]
     if: ${{ always() && (inputs.environment == 'dev' || inputs.environment == 'prd') && !(inputs.environment == 'dev' && startsWith(inputs.branch, 'feature-')) && needs.package-and-publish.result == 'success' && (needs.deploy-us.result == 'success' || needs.deploy-eu.result == 'success') }}
-    uses: ./.github/workflows/release-management.yml
+    uses: ./.github/workflows/tag-and-merge.yml
     with:
       release_type: ${{ inputs.environment == 'prd' && 'production' || 'dev' }}
       artifact_version: ${{ needs.package-and-publish.outputs.artifact-version }}
