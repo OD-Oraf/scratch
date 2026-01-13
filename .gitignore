@@ -2,17 +2,7 @@ venv
 .idea
 __pycache__
 
-My primary focus has been advancing our automation project objectives. We're currently planning to migrate our Bitbucket repositories to GitHub and leverage GitHub Actions for our CI/CD processes. As part of this initiative, I'm responsible for setting up the necessary automations post-migration to ensure a smooth transition with minimal disruption to developer workflows.
-
-I've discovered the significance of soliciting constructive feedback throughout my work on various automation projects. This experience has taught me the importance of continuous learning and adaptation. Over time, I've developed a practice of making incremental improvements, refining my approach as I gain deeper familiarity with the platforms and technologies involved. As I progress, I'm able to create more tailored solutions that effectively address specific constraints and requirements, enhancing the overall efficiency and effectiveness of our automation tools.
-
-
-As I look to the future, I'm committed to further enhancing my skillset to contribute more significantly to our team's success. My goal is to continue developing advanced automation capabilities, expanding my knowledge of CI/CD pipelines, and exploring cutting-edge tools and practices in software development. By continuously updating my skills and staying abreast of industry trends, I aim to:
-
-Enhance our team's efficiency through more sophisticated automation solutions
-Improve our CI/CD processes, reducing deployment times and increasing reliability
-Contribute to knowledge sharing within the team, mentoring junior developers when possible
-Stay at the forefront of technological advancements to drive innovation in our projects
-I'm committed to ongoing learning and professional growth, recognizing that this will enable me to make more substantial contributions to our team's objectives and help drive our automation project forward.
 
 .DS_Store
+
+/gh-cli/api/*.pem
