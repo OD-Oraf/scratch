@@ -9,19 +9,23 @@ Just set the configuration variables below and run: python github-app.py
 import sys
 import time
 import subprocess
+import os
 
 import jwt
 import requests
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
+load_dotenv()
 
 # =============================================================================
-# CONFIGURATION - Update these values
+# CONFIGURATION - Loaded from .env file
 # =============================================================================
-GITHUB_APP_ID = "1365153"
-GITHUB_APP_PRIVATE_KEY_PATH = "./od-oraf-test-app.2026-01-13.private-key.pem"  # Path to your .pem file
-GITHUB_APP_INSTALLATION_ID = "69770355"
-GIT_URL = "https://github.com/OD-Oraf/scratch"
-CLONE_DEST = ""  # Optional: destination folder (leave empty for repo name)
+GITHUB_APP_ID = os.getenv("GITHUB_APP_ID")
+GITHUB_APP_PRIVATE_KEY_PATH = os.getenv("GITHUB_APP_PRIVATE_KEY_PATH")
+GITHUB_APP_INSTALLATION_ID = os.getenv("GITHUB_APP_INSTALLATION_ID")
+GIT_URL = os.getenv("GIT_URL")
+CLONE_DEST = os.getenv("GIT_DEST", "")
 # =============================================================================
 
 
