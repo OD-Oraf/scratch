@@ -44,24 +44,43 @@ on:
 jobs:
   test-github-app-token:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate token
+      - name: Generate GitHub App token
         id: generate-token
         uses: actions/create-github-app-token@v1
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
-      - name: Use the token
+      - name: Test token with API call
         run: |
           echo "Token generated successfully"
-          # Test the token by making an API call
           curl -H "Authorization: Bearer ${{ steps.generate-token.outputs.token }}" \
                -H "Accept: application/vnd.github+json" \
                https://api.github.com/repos/${{ github.repository }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-app[bot]"
+          git config user.email "${{ secrets.APP_ID }}+github-app[bot]@users.noreply.github.com"
+
+      - name: Create test file and commit
+        run: |
+          echo "Test commit from GitHub App at $(date)" > test-github-app-commit.txt
+          git add test-github-app-commit.txt
+          git commit -m "Test commit via GitHub App token"
+
+      - name: Push changes using GitHub App token
+        run: |
+          git remote set-url origin https://x-access-token:${{ steps.generate-token.outputs.token }}@github.com/${{ github.repository }}.git
+          git push origin ${{ github.ref_name }}
 
 #  call-mulesoft-deploy:
 #    permissions:
