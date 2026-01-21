@@ -24,6 +24,13 @@ on:
         type: boolean
         required: false
         default: true
+    secrets:
+      GH_APP_ID:
+        description: 'GitHub App ID'
+        required: true
+      GH_APP_PRIVATE_KEY_BASE64:
+        description: 'GitHub App private key (base64 encoded)'
+        required: true
 
 jobs:
   # Dev Release: Create version tag
@@ -33,10 +40,24 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+      - name: Decode GitHub App Private Key
+        id: decode-key
+        run: |
+          echo "${{ secrets.GH_APP_PRIVATE_KEY_BASE64 }}" | base64 -d > /tmp/gh-app-key.pem
+          echo "private-key-path=/tmp/gh-app-key.pem" >> $GITHUB_OUTPUT
+      
+      - name: Generate GitHub App Token
+        id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key-path: ${{ steps.decode-key.outputs.private-key-path }}
+      
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.source_ref }}
+          token: ${{ steps.generate-token.outputs.token }}
       
       - name: Create and push tag
         run: |
@@ -80,11 +101,25 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+      - name: Decode GitHub App Private Key
+        id: decode-key
+        run: |
+          echo "${{ secrets.APP_PRIVATE_KEY }}" | base64 -d > /tmp/gh-app-key.pem
+          echo "private-key-path=/tmp/gh-app-key.pem" >> $GITHUB_OUTPUT
+      
+      - name: Generate GitHub App Token
+        id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key-path: ${{ steps.decode-key.outputs.private-key-path }}
+      
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.source_ref }}
           fetch-depth: 0
+          token: ${{ steps.generate-token.outputs.token }}
       
       - name: Create production release tag
         run: |
