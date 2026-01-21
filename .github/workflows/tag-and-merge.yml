@@ -28,7 +28,7 @@ on:
       GH_APP_ID:
         description: 'GitHub App ID'
         required: true
-      GH_APP_PRIVATE_KEY_BASE64:
+      APP_PRIVATE_KEY:
         description: 'GitHub App private key (base64 encoded)'
         required: true
 
@@ -43,7 +43,7 @@ jobs:
       - name: Decode GitHub App Private Key
         id: decode-key
         run: |
-          echo "${{ secrets.GH_APP_PRIVATE_KEY_BASE64 }}" | base64 -d > /tmp/gh-app-key.pem
+          echo "${{ secrets.APP_PRIVATE_KEY }}" | base64 -d > /tmp/gh-app-key.pem
           echo "private-key-path=/tmp/gh-app-key.pem" >> $GITHUB_OUTPUT
       
       - name: Generate GitHub App Token
