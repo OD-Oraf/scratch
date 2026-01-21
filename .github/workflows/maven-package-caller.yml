@@ -52,12 +52,18 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Decode GitHub App Private Key
+        id: decode-key
+        run: |
+          echo "${{ secrets.APP_PRIVATE_KEY }}" | base64 -d > /tmp/gh-app-key.pem
+          echo "private-key-path=/tmp/gh-app-key.pem" >> $GITHUB_OUTPUT
+
       - name: Generate GitHub App token
         id: generate-token
         uses: actions/create-github-app-token@v1
         with:
           app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          private-key-path: ${{ steps.decode-key.outputs.private-key-path }}
 
       - name: Test token with API call
         run: |
