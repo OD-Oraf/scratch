@@ -1,0 +1,16 @@
+    # Use file contents directly (no shell interpretation)
+    USERNAME=$(cat /tmp/username.txt)
+    PASSWORD=$(cat /tmp/password.txt)
+
+    # XML escape
+    PASSWORD="${PASSWORD//&/&amp;}"
+    PASSWORD="${PASSWORD//</&lt;}"
+    PASSWORD="${PASSWORD//>/&gt;}"
+    PASSWORD="${PASSWORD//\"/&quot;}"
+
+    # Substitute using different delimiter to avoid conflicts
+    sed -i "s#USERNAME_PLACEHOLDER#${USERNAME}#g" ~/.m2/settings.xml
+    sed -i "s#PASSWORD_PLACEHOLDER#${PASSWORD}#g" ~/.m2/settings.xml
+
+    # Cleanup
+    rm -f /tmp/username.txt /tmp/password.txt
