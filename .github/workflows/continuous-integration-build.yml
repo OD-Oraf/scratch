@@ -37,7 +37,7 @@ jobs:
 #        run: ./gradlew build
 
       - name: Build Complete with Maven
-        working-directory: ./complete
+        working-directory: ./java/gs-rest-service/complete
         run: ./mvnw --batch-mode clean package
 
 #      - name: Build Complete with Gradle
