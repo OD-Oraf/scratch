@@ -1,0 +1,248 @@
+name: 'Mule RTF Deploy via Maven'
+description: |
+  Deploys a MuleSoft application to Runtime Fabric (RTF) using mvn deploy.
+  Supports two-layer configuration:
+    Layer 1 (org-level)  — provided as inputs by the caller workflow
+    Layer 2 (app-level)  — loaded from a properties file in the app repo
+  Explicit inputs always override values from the properties file.
+
+inputs:
+  # ── Properties file (app-level defaults) ───────────────────────
+  deploy_properties_file:
+    description: |
+      Path to a key=value properties file in the repo that supplies
+      app-level deploy defaults.  Keys use Maven -D property names:
+        rtf.applicationName, rtf.replicas, rtf.cpuReserved, rtf.cpuMax,
+        rtf.memoryReserved, rtf.memoryMax, rtf.provider,
+        mule.env, skipTests
+      Lines starting with # and blank lines are ignored.
+    required: false
+    default: ''
+
+  # ── Project ────────────────────────────────────────────────────
+  pom_file_path:
+    description: 'Path to the directory containing pom.xml'
+    required: false
+    default: 'java/my-app'
+  skip_tests:
+    description: '-DskipTests flag (true/false)'
+    required: false
+    default: ''
+
+  # ── Anypoint Platform (org-level — always from caller) ─────────
+  anypoint_uri:
+    description: '-Danypoint.uri  (Anypoint Platform base URI)'
+    required: false
+    default: 'https://anypoint.mulesoft.com'
+  anypoint_environment:
+    description: '-Danypoint.environment  (Anypoint environment name)'
+    required: true
+  anypoint_business_group_id:
+    description: '-Danypoint.businessGroupId'
+    required: true
+
+  # ── Connected App auth (org-level secrets — always from caller) ─
+  connected_app_client_id:
+    description: '-Dconnected.app.clientId'
+    required: true
+  connected_app_client_secret:
+    description: '-Dconnected.app.clientSecret'
+    required: true
+  connected_app_grant_type:
+    description: '-Dconnected.app.grantType'
+    required: false
+    default: 'client_credentials'
+
+  # ── RTF target (org-level — always from caller) ────────────────
+  rtf_target:
+    description: '-Drtf.target  (RTF cluster / target name)'
+    required: true
+
+  # ── RTF app config (app-level — can come from properties file) ─
+  rtf_provider:
+    description: '-Drtf.provider  (e.g. MC)'
+    required: false
+    default: ''
+  rtf_application_name:
+    description: '-Drtf.applicationName'
+    required: false
+    default: ''
+  rtf_replicas:
+    description: '-Drtf.replicas'
+    required: false
+    default: ''
+  rtf_cpu_reserved:
+    description: '-Drtf.cpuReserved  (e.g. 500m)'
+    required: false
+    default: ''
+  rtf_cpu_max:
+    description: '-Drtf.cpuMax  (e.g. 1000m)'
+    required: false
+    default: ''
+  rtf_memory_reserved:
+    description: '-Drtf.memoryReserved  (e.g. 700Mi)'
+    required: false
+    default: ''
+  rtf_memory_max:
+    description: '-Drtf.memoryMax  (e.g. 1000Mi)'
+    required: false
+    default: ''
+
+  # ── Mule runtime (app-level — can come from properties file) ───
+  mule_env:
+    description: '-Dmule.env  (defaults to anypoint_environment)'
+    required: false
+    default: ''
+  mule_key:
+    description: '-Dmule.key  (Mule encryption key — secret)'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    # ── Step 1: Load properties file into GITHUB_OUTPUT ──────────
+    - name: Load deploy properties file
+      id: props
+      shell: bash
+      run: |
+        PROPS_FILE="${{ inputs.deploy_properties_file }}"
+        if [ -n "$PROPS_FILE" ] && [ -f "$PROPS_FILE" ]; then
+          echo "📄 Loading properties from $PROPS_FILE"
+          while IFS='=' read -r key value; do
+            # Skip blanks, comments, and INI section headers
+            [[ -z "$key" || "$key" == \#* || "$key" == \[* ]] && continue
+            # Trim whitespace
+            key=$(echo "$key" | xargs)
+            value=$(echo "$value" | xargs)
+            echo "  $key=$value"
+            echo "$key=$value" >> "$GITHUB_OUTPUT"
+          done < "$PROPS_FILE"
+        else
+          echo "ℹ️  No properties file provided or file not found — using inputs only"
+        fi
+
+    # ── Step 2: Resolve final config (input > file > default) ────
+    - name: Resolve configuration
+      id: config
+      shell: bash
+      run: |
+        # Helper: first non-empty value wins
+        resolve() {
+          for val in "$@"; do
+            if [ -n "$val" ]; then echo "$val"; return; fi
+          done
+        }
+
+        # Props from file (step outputs)
+        FILE_APP_NAME="${{ steps.props.outputs.rtf.applicationName }}"
+        FILE_REPLICAS="${{ steps.props.outputs.rtf.replicas }}"
+        FILE_CPU_RESERVED="${{ steps.props.outputs.rtf.cpuReserved }}"
+        FILE_CPU_MAX="${{ steps.props.outputs.rtf.cpuMax }}"
+        FILE_MEM_RESERVED="${{ steps.props.outputs.rtf.memoryReserved }}"
+        FILE_MEM_MAX="${{ steps.props.outputs.rtf.memoryMax }}"
+        FILE_PROVIDER="${{ steps.props.outputs.rtf.provider }}"
+        FILE_MULE_ENV="${{ steps.props.outputs.mule.env }}"
+        FILE_SKIP_TESTS="${{ steps.props.outputs.skipTests }}"
+
+        # Resolve: explicit input → file → hardcoded default
+        echo "rtf_application_name=$(resolve '${{ inputs.rtf_application_name }}' "$FILE_APP_NAME")" >> "$GITHUB_OUTPUT"
+        echo "rtf_replicas=$(resolve '${{ inputs.rtf_replicas }}' "$FILE_REPLICAS" '1')" >> "$GITHUB_OUTPUT"
+        echo "rtf_cpu_reserved=$(resolve '${{ inputs.rtf_cpu_reserved }}' "$FILE_CPU_RESERVED" '500m')" >> "$GITHUB_OUTPUT"
+        echo "rtf_cpu_max=$(resolve '${{ inputs.rtf_cpu_max }}' "$FILE_CPU_MAX" '1000m')" >> "$GITHUB_OUTPUT"
+        echo "rtf_memory_reserved=$(resolve '${{ inputs.rtf_memory_reserved }}' "$FILE_MEM_RESERVED" '700Mi')" >> "$GITHUB_OUTPUT"
+        echo "rtf_memory_max=$(resolve '${{ inputs.rtf_memory_max }}' "$FILE_MEM_MAX" '1000Mi')" >> "$GITHUB_OUTPUT"
+        echo "rtf_provider=$(resolve '${{ inputs.rtf_provider }}' "$FILE_PROVIDER" 'MC')" >> "$GITHUB_OUTPUT"
+        echo "mule_env=$(resolve '${{ inputs.mule_env }}' "$FILE_MULE_ENV" '${{ inputs.anypoint_environment }}')" >> "$GITHUB_OUTPUT"
+        echo "skip_tests=$(resolve '${{ inputs.skip_tests }}' "$FILE_SKIP_TESTS" 'true')" >> "$GITHUB_OUTPUT"
+
+        echo "✓ Configuration resolved"
+
+    # ── Step 3: Validate pom.xml ─────────────────────────────────
+    - name: Validate pom.xml path
+      shell: bash
+      run: |
+        POM_DIR="${{ inputs.pom_file_path }}"
+        if [ ! -f "$POM_DIR/pom.xml" ]; then
+          echo "::error::pom.xml not found at $POM_DIR/pom.xml"
+          exit 1
+        fi
+        echo "✓ Found pom.xml at $POM_DIR/pom.xml"
+
+    # ── Step 4: Extract artifact info ────────────────────────────
+    - name: Extract artifact info
+      id: extract-version
+      shell: bash
+      run: |
+        POM_DIR="${{ inputs.pom_file_path }}"
+        VERSION=$(mvn -f "$POM_DIR/pom.xml" help:evaluate -Dexpression=project.version -q -DforceStdout)
+        NAME=$(mvn -f "$POM_DIR/pom.xml" help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        echo "name=$NAME" >> "$GITHUB_OUTPUT"
+        echo "📦 Artifact: $NAME-$VERSION"
+
+    # ── Step 5: Build & execute mvn deploy ───────────────────────
+    - name: Deploy to RTF via Maven
+      shell: bash
+      env:
+        INPUT_CONNECTED_APP_CLIENT_ID: ${{ inputs.connected_app_client_id }}
+        INPUT_CONNECTED_APP_CLIENT_SECRET: ${{ inputs.connected_app_client_secret }}
+        INPUT_MULE_KEY: ${{ inputs.mule_key }}
+      run: |
+        # ── Build the mvn deploy command ──────────────────────────
+        CMD="mvn deploy -f ${{ inputs.pom_file_path }}/pom.xml"
+        CMD="$CMD -DmuleDeploy"
+        CMD="$CMD -DskipTests=${{ steps.config.outputs.skip_tests }}"
+
+        # Anypoint Platform (org-level)
+        CMD="$CMD -Danypoint.uri=${{ inputs.anypoint_uri }}"
+        CMD="$CMD -Danypoint.environment=${{ inputs.anypoint_environment }}"
+        CMD="$CMD -Danypoint.businessGroupId=${{ inputs.anypoint_business_group_id }}"
+
+        # Connected App auth (org-level secrets)
+        CMD="$CMD -Dconnected.app.clientId=${INPUT_CONNECTED_APP_CLIENT_ID}"
+        CMD="$CMD -Dconnected.app.clientSecret=${INPUT_CONNECTED_APP_CLIENT_SECRET}"
+        CMD="$CMD -Dconnected.app.grantType=${{ inputs.connected_app_grant_type }}"
+
+        # RTF target (org-level)
+        CMD="$CMD -Drtf.target=${{ inputs.rtf_target }}"
+
+        # RTF app config (resolved: input > file > default)
+        CMD="$CMD -Drtf.provider=${{ steps.config.outputs.rtf_provider }}"
+        CMD="$CMD -Drtf.applicationName=${{ steps.config.outputs.rtf_application_name }}"
+        CMD="$CMD -Drtf.replicas=${{ steps.config.outputs.rtf_replicas }}"
+        CMD="$CMD -Drtf.cpuReserved=${{ steps.config.outputs.rtf_cpu_reserved }}"
+        CMD="$CMD -Drtf.cpuMax=${{ steps.config.outputs.rtf_cpu_max }}"
+        CMD="$CMD -Drtf.memoryReserved=${{ steps.config.outputs.rtf_memory_reserved }}"
+        CMD="$CMD -Drtf.memoryMax=${{ steps.config.outputs.rtf_memory_max }}"
+
+        # Mule runtime (resolved)
+        CMD="$CMD -Dmule.env=${{ steps.config.outputs.mule_env }}"
+
+        # Mule encryption key (only if provided)
+        if [ -n "${INPUT_MULE_KEY}" ]; then
+          CMD="$CMD -Dmule.key=${INPUT_MULE_KEY}"
+        fi
+
+        # ── Log a redacted version ────────────────────────────────
+        SAFE_CMD=$(echo "$CMD" | sed \
+          -e "s/-Dconnected.app.clientId=[^ ]*/-Dconnected.app.clientId=***/" \
+          -e "s/-Dconnected.app.clientSecret=[^ ]*/-Dconnected.app.clientSecret=***/" \
+          -e "s/-Dmule.key=[^ ]*/-Dmule.key=***/")
+
+        echo "═══════════════════════════════════════════════════════"
+        echo "🚀 DEPLOYING TO RTF"
+        echo "═══════════════════════════════════════════════════════"
+        echo ""
+        echo "Application: ${{ steps.config.outputs.rtf_application_name }}"
+        echo "Target:      ${{ inputs.rtf_target }}"
+        echo "Replicas:    ${{ steps.config.outputs.rtf_replicas }}"
+        echo "CPU:         ${{ steps.config.outputs.rtf_cpu_reserved }} / ${{ steps.config.outputs.rtf_cpu_max }}"
+        echo "Memory:      ${{ steps.config.outputs.rtf_memory_reserved }} / ${{ steps.config.outputs.rtf_memory_max }}"
+        echo ""
+        echo "Maven command (redacted):"
+        echo "$SAFE_CMD"
+        echo ""
+
+        # ── Execute ───────────────────────────────────────────────
+        eval "$CMD"

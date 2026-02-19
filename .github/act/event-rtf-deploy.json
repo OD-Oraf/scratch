@@ -1,0 +1,11 @@
+{
+  "inputs": {
+    "environment": "dev",
+    "pom_file_path": "java/my-app",
+    "branch": "develop",
+    "tag": "",
+    "anypoint_uri": "https://anypoint.mulesoft.com",
+    "anypoint_business_group_id": "my-bg-id-1234",
+    "rtf_target": "my-rtf-cluster"
+  }
+}

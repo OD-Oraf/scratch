@@ -1,0 +1,98 @@
+name: Mule RTF Deploy
+
+run-name: "RTF Deploy ${{ inputs.environment }} [${{ inputs.environment == 'dev' && inputs.branch || inputs.tag }}]"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        type: choice
+        options:
+          - dev
+          - sit
+          - uat
+          - prd
+        required: true
+        default: 'dev'
+      pom_file_path:
+        description: 'Path to the directory containing pom.xml'
+        type: string
+        required: false
+        default: 'java/my-app'
+      branch:
+        description: 'Branch to deploy (dev only)'
+        type: string
+        required: false
+        default: 'develop'
+      tag:
+        description: 'Tag to deploy (required for sit/uat/prd)'
+        type: string
+        required: false
+        default: ''
+      # ── Org-level (these would typically come from GitHub org vars) ──
+      anypoint_uri:
+        description: 'Anypoint Platform base URI'
+        type: string
+        required: false
+        default: 'https://anypoint.mulesoft.com'
+      anypoint_business_group_id:
+        description: 'Anypoint business group ID'
+        type: string
+        required: true
+      rtf_target:
+        description: 'RTF cluster / target name'
+        type: string
+        required: true
+
+# ─────────────────────────────────────────────────────────────────
+# App-level values (replicas, CPU, memory, app name, etc.) are
+# loaded from:  <pom_file_path>/deploy/<environment>.properties
+# Any value can still be overridden via the composite action inputs.
+# ─────────────────────────────────────────────────────────────────
+
+jobs:
+  deploy-to-rtf:
+    name: Deploy to RTF (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Validate tag for non-dev environments
+        if: ${{ inputs.environment != 'dev' && inputs.tag == '' }}
+        run: |
+          echo "::error::Tag is required for non-dev environments (environment=${{ inputs.environment }})"
+          exit 1
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.environment == 'dev' && inputs.branch || inputs.tag }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles(format('{0}/pom.xml', inputs.pom_file_path)) }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Deploy to RTF
+        uses: ./.github/actions/mule-rtf-deploy
+        with:
+          # Properties file — app-level defaults
+          deploy_properties_file: ${{ inputs.pom_file_path }}/deploy/${{ inputs.environment }}.properties
+          pom_file_path: ${{ inputs.pom_file_path }}
+          # Org-level values
+          anypoint_uri: ${{ inputs.anypoint_uri }}
+          anypoint_environment: ${{ inputs.environment }}
+          anypoint_business_group_id: ${{ inputs.anypoint_business_group_id }}
+          connected_app_client_id: ${{ secrets.CONNECTED_APP_CLIENT_ID }}
+          connected_app_client_secret: ${{ secrets.CONNECTED_APP_CLIENT_SECRET }}
+          rtf_target: ${{ inputs.rtf_target }}
