@@ -6,3 +6,6 @@ __pycache__
 .DS_Store
 
 /gh-cli/api/*.pem
+.secrets
+
+gh-cli/archive-*
