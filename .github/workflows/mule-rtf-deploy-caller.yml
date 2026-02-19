@@ -1,4 +1,4 @@
-name: Mule RTF Deploy
+name: Mule RTF Deploy (Action Implementation)
 
 run-name: "RTF Deploy ${{ inputs.environment }} [${{ inputs.environment == 'dev' && inputs.branch || inputs.tag }}]"
 
