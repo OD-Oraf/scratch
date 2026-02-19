@@ -40,10 +40,12 @@ on:
         description: 'Anypoint business group ID'
         type: string
         required: true
+        default: 'gip'
       rtf_target:
         description: 'RTF cluster / target name'
         type: string
         required: true
+        default: 'gip-rtf-cluster'
 
 # ─────────────────────────────────────────────────────────────────
 # App-level values (replicas, CPU, memory, app name, etc.) are
