@@ -1,21 +1,29 @@
 name: 'Mule RTF Deploy via Maven'
 description: |
   Deploys a MuleSoft application to Runtime Fabric (RTF) using mvn deploy.
-  Supports two-layer configuration:
-    Layer 1 (org-level)  — provided as inputs by the caller workflow
-    Layer 2 (app-level)  — loaded from a properties file in the app repo
-  Explicit inputs always override values from the properties file.
+  Supports three-layer configuration (highest priority first):
+    1. Explicit inputs     — passed directly by the caller
+    2. Org properties file — written by the caller (org-specific, per-env)
+    3. App properties file — checked into the app repo (app-specific, per-env)
+    4. Hardcoded defaults  — built into this action
+  Both properties files use Maven -D property names as keys (key=value format).
 
 inputs:
-  # ── Properties file (app-level defaults) ───────────────────────
+  # ── Properties files ──────────────────────────────────────────
   deploy_properties_file:
     description: |
-      Path to a key=value properties file in the repo that supplies
-      app-level deploy defaults.  Keys use Maven -D property names:
+      Path to org-level properties file (typically written to RUNNER_TEMP
+      by the caller).  Contains org-specific values such as:
+        anypoint.environment, anypoint.businessGroupId, rtf.target,
+        rtf.provider, connected.app.grantType, mule.env
+    required: false
+    default: ''
+  app_properties_file:
+    description: |
+      Path to app-level properties file in the repo.  Contains app-specific
+      values such as:
         rtf.applicationName, rtf.replicas, rtf.cpuReserved, rtf.cpuMax,
-        rtf.memoryReserved, rtf.memoryMax, rtf.provider,
-        mule.env, skipTests
-      Lines starting with # and blank lines are ignored.
+        rtf.memoryReserved, rtf.memoryMax, skipTests
     required: false
     default: ''
 
@@ -29,19 +37,21 @@ inputs:
     required: false
     default: ''
 
-  # ── Anypoint Platform (org-level — always from caller) ─────────
+  # ── Anypoint Platform (can come from org properties file) ──────
   anypoint_uri:
     description: '-Danypoint.uri  (Anypoint Platform base URI)'
     required: false
     default: 'https://anypoint.mulesoft.com'
   anypoint_environment:
     description: '-Danypoint.environment  (Anypoint environment name)'
-    required: true
+    required: false
+    default: ''
   anypoint_business_group_id:
     description: '-Danypoint.businessGroupId'
-    required: true
+    required: false
+    default: ''
 
-  # ── Connected App auth (org-level secrets — always from caller) ─
+  # ── Connected App auth (secrets — always from caller) ──────────
   connected_app_client_id:
     description: '-Dconnected.app.clientId'
     required: true
@@ -51,14 +61,13 @@ inputs:
   connected_app_grant_type:
     description: '-Dconnected.app.grantType'
     required: false
-    default: 'client_credentials'
+    default: ''
 
-  # ── RTF target (org-level — always from caller) ────────────────
+  # ── RTF configuration (can come from either properties file) ───
   rtf_target:
     description: '-Drtf.target  (RTF cluster / target name)'
-    required: true
-
-  # ── RTF app config (app-level — can come from properties file) ─
+    required: false
+    default: ''
   rtf_provider:
     description: '-Drtf.provider  (e.g. MC)'
     required: false
@@ -88,9 +97,9 @@ inputs:
     required: false
     default: ''
 
-  # ── Mule runtime (app-level — can come from properties file) ───
+  # ── Mule runtime (can come from either properties file) ────────
   mule_env:
-    description: '-Dmule.env  (defaults to anypoint_environment)'
+    description: '-Dmule.env  (defaults to anypoint.environment)'
     required: false
     default: ''
   mule_key:
@@ -101,64 +110,96 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    # ── Step 1: Load properties file into GITHUB_OUTPUT ──────────
-    - name: Load deploy properties file
-      id: props
+    # ── Step 1: Load app-level properties file ─────────────────
+    - name: Load app properties file
+      id: app-props
       shell: bash
       run: |
-        PROPS_FILE="${{ inputs.deploy_properties_file }}"
+        PROPS_FILE="${{ inputs.app_properties_file }}"
         if [ -n "$PROPS_FILE" ] && [ -f "$PROPS_FILE" ]; then
-          echo "📄 Loading properties from $PROPS_FILE"
+          echo "📄 Loading app properties from $PROPS_FILE"
           while IFS='=' read -r key value; do
-            # Skip blanks, comments, and INI section headers
             [[ -z "$key" || "$key" == \#* || "$key" == \[* ]] && continue
-            # Trim whitespace
             key=$(echo "$key" | xargs)
             value=$(echo "$value" | xargs)
             echo "  $key=$value"
             echo "$key=$value" >> "$GITHUB_OUTPUT"
           done < "$PROPS_FILE"
         else
-          echo "ℹ️  No properties file provided or file not found — using inputs only"
+          echo "ℹ️  No app properties file — skipping"
         fi
 
-    # ── Step 2: Resolve final config (input > file > default) ────
+    # ── Step 2: Load org-level properties file ─────────────────
+    - name: Load org properties file
+      id: org-props
+      shell: bash
+      run: |
+        PROPS_FILE="${{ inputs.deploy_properties_file }}"
+        if [ -n "$PROPS_FILE" ] && [ -f "$PROPS_FILE" ]; then
+          echo "📄 Loading org properties from $PROPS_FILE"
+          while IFS='=' read -r key value; do
+            [[ -z "$key" || "$key" == \#* || "$key" == \[* ]] && continue
+            key=$(echo "$key" | xargs)
+            value=$(echo "$value" | xargs)
+            echo "  $key=$value"
+            echo "$key=$value" >> "$GITHUB_OUTPUT"
+          done < "$PROPS_FILE"
+        else
+          echo "ℹ️  No org properties file — skipping"
+        fi
+
+    # ── Step 3: Resolve final config ───────────────────────────
+    #   Precedence: explicit input > org file > app file > default
     - name: Resolve configuration
       id: config
       shell: bash
       run: |
-        # Helper: first non-empty value wins
         resolve() {
           for val in "$@"; do
             if [ -n "$val" ]; then echo "$val"; return; fi
           done
         }
 
-        # Props from file (step outputs)
-        FILE_APP_NAME="${{ steps.props.outputs.rtf.applicationName }}"
-        FILE_REPLICAS="${{ steps.props.outputs.rtf.replicas }}"
-        FILE_CPU_RESERVED="${{ steps.props.outputs.rtf.cpuReserved }}"
-        FILE_CPU_MAX="${{ steps.props.outputs.rtf.cpuMax }}"
-        FILE_MEM_RESERVED="${{ steps.props.outputs.rtf.memoryReserved }}"
-        FILE_MEM_MAX="${{ steps.props.outputs.rtf.memoryMax }}"
-        FILE_PROVIDER="${{ steps.props.outputs.rtf.provider }}"
-        FILE_MULE_ENV="${{ steps.props.outputs.mule.env }}"
-        FILE_SKIP_TESTS="${{ steps.props.outputs.skipTests }}"
+        # Org-level file values
+        ORG_AP_ENV="${{ steps.org-props.outputs.anypoint.environment }}"
+        ORG_BG_ID="${{ steps.org-props.outputs.anypoint.businessGroupId }}"
+        ORG_RTF_TARGET="${{ steps.org-props.outputs.rtf.target }}"
+        ORG_RTF_PROVIDER="${{ steps.org-props.outputs.rtf.provider }}"
+        ORG_GRANT_TYPE="${{ steps.org-props.outputs.connected.app.grantType }}"
+        ORG_MULE_ENV="${{ steps.org-props.outputs.mule.env }}"
 
-        # Resolve: explicit input → file → hardcoded default
-        echo "rtf_application_name=$(resolve '${{ inputs.rtf_application_name }}' "$FILE_APP_NAME")" >> "$GITHUB_OUTPUT"
-        echo "rtf_replicas=$(resolve '${{ inputs.rtf_replicas }}' "$FILE_REPLICAS" '1')" >> "$GITHUB_OUTPUT"
-        echo "rtf_cpu_reserved=$(resolve '${{ inputs.rtf_cpu_reserved }}' "$FILE_CPU_RESERVED" '500m')" >> "$GITHUB_OUTPUT"
-        echo "rtf_cpu_max=$(resolve '${{ inputs.rtf_cpu_max }}' "$FILE_CPU_MAX" '1000m')" >> "$GITHUB_OUTPUT"
-        echo "rtf_memory_reserved=$(resolve '${{ inputs.rtf_memory_reserved }}' "$FILE_MEM_RESERVED" '700Mi')" >> "$GITHUB_OUTPUT"
-        echo "rtf_memory_max=$(resolve '${{ inputs.rtf_memory_max }}' "$FILE_MEM_MAX" '1000Mi')" >> "$GITHUB_OUTPUT"
-        echo "rtf_provider=$(resolve '${{ inputs.rtf_provider }}' "$FILE_PROVIDER" 'MC')" >> "$GITHUB_OUTPUT"
-        echo "mule_env=$(resolve '${{ inputs.mule_env }}' "$FILE_MULE_ENV" '${{ inputs.anypoint_environment }}')" >> "$GITHUB_OUTPUT"
-        echo "skip_tests=$(resolve '${{ inputs.skip_tests }}' "$FILE_SKIP_TESTS" 'true')" >> "$GITHUB_OUTPUT"
+        # App-level file values
+        APP_NAME="${{ steps.app-props.outputs.rtf.applicationName }}"
+        APP_REPLICAS="${{ steps.app-props.outputs.rtf.replicas }}"
+        APP_CPU_RESERVED="${{ steps.app-props.outputs.rtf.cpuReserved }}"
+        APP_CPU_MAX="${{ steps.app-props.outputs.rtf.cpuMax }}"
+        APP_MEM_RESERVED="${{ steps.app-props.outputs.rtf.memoryReserved }}"
+        APP_MEM_MAX="${{ steps.app-props.outputs.rtf.memoryMax }}"
+        APP_PROVIDER="${{ steps.app-props.outputs.rtf.provider }}"
+        APP_MULE_ENV="${{ steps.app-props.outputs.mule.env }}"
+        APP_SKIP_TESTS="${{ steps.app-props.outputs.skipTests }}"
 
-        echo "✓ Configuration resolved"
+        # Resolve: input → org file → app file → hardcoded default
+        echo "anypoint_environment=$(resolve  '${{ inputs.anypoint_environment }}'  "$ORG_AP_ENV")" >> "$GITHUB_OUTPUT"
+        echo "anypoint_bg_id=$(resolve        '${{ inputs.anypoint_business_group_id }}' "$ORG_BG_ID")" >> "$GITHUB_OUTPUT"
+        echo "rtf_target=$(resolve            '${{ inputs.rtf_target }}'            "$ORG_RTF_TARGET")" >> "$GITHUB_OUTPUT"
+        echo "connected_app_grant_type=$(resolve '${{ inputs.connected_app_grant_type }}' "$ORG_GRANT_TYPE" 'client_credentials')" >> "$GITHUB_OUTPUT"
+        echo "rtf_provider=$(resolve          '${{ inputs.rtf_provider }}'          "$ORG_RTF_PROVIDER" "$APP_PROVIDER" 'MC')" >> "$GITHUB_OUTPUT"
+        echo "rtf_application_name=$(resolve  '${{ inputs.rtf_application_name }}'  "$APP_NAME")" >> "$GITHUB_OUTPUT"
+        echo "rtf_replicas=$(resolve          '${{ inputs.rtf_replicas }}'          "$APP_REPLICAS" '1')" >> "$GITHUB_OUTPUT"
+        echo "rtf_cpu_reserved=$(resolve      '${{ inputs.rtf_cpu_reserved }}'      "$APP_CPU_RESERVED" '500m')" >> "$GITHUB_OUTPUT"
+        echo "rtf_cpu_max=$(resolve           '${{ inputs.rtf_cpu_max }}'           "$APP_CPU_MAX" '1000m')" >> "$GITHUB_OUTPUT"
+        echo "rtf_memory_reserved=$(resolve   '${{ inputs.rtf_memory_reserved }}'   "$APP_MEM_RESERVED" '700Mi')" >> "$GITHUB_OUTPUT"
+        echo "rtf_memory_max=$(resolve        '${{ inputs.rtf_memory_max }}'        "$APP_MEM_MAX" '1000Mi')" >> "$GITHUB_OUTPUT"
+        echo "skip_tests=$(resolve            '${{ inputs.skip_tests }}'            "$APP_SKIP_TESTS" 'true')" >> "$GITHUB_OUTPUT"
 
-    # ── Step 3: Validate pom.xml ─────────────────────────────────
+        # mule.env: input → org file → app file → anypoint_environment
+        RESOLVED_AP_ENV=$(resolve '${{ inputs.anypoint_environment }}' "$ORG_AP_ENV")
+        echo "mule_env=$(resolve '${{ inputs.mule_env }}' "$ORG_MULE_ENV" "$APP_MULE_ENV" "$RESOLVED_AP_ENV")" >> "$GITHUB_OUTPUT"
+
+        echo "✓ Configuration resolved (input > org file > app file > default)"
+
+    # ── Step 4: Validate pom.xml ───────────────────────────────
     - name: Validate pom.xml path
       shell: bash
       run: |
@@ -169,7 +210,7 @@ runs:
         fi
         echo "✓ Found pom.xml at $POM_DIR/pom.xml"
 
-    # ── Step 4: Extract artifact info ────────────────────────────
+    # ── Step 5: Extract artifact info ──────────────────────────
     - name: Extract artifact info
       id: extract-version
       shell: bash
@@ -181,7 +222,7 @@ runs:
         echo "name=$NAME" >> "$GITHUB_OUTPUT"
         echo "📦 Artifact: $NAME-$VERSION"
 
-    # ── Step 5: Build & execute mvn deploy ───────────────────────
+    # ── Step 6: Build & execute mvn deploy ─────────────────────
     - name: Deploy to RTF via Maven
       shell: bash
       env:
@@ -194,20 +235,18 @@ runs:
         CMD="$CMD -DmuleDeploy"
         CMD="$CMD -DskipTests=${{ steps.config.outputs.skip_tests }}"
 
-        # Anypoint Platform (org-level)
+        # Anypoint Platform
         CMD="$CMD -Danypoint.uri=${{ inputs.anypoint_uri }}"
-        CMD="$CMD -Danypoint.environment=${{ inputs.anypoint_environment }}"
-        CMD="$CMD -Danypoint.businessGroupId=${{ inputs.anypoint_business_group_id }}"
+        CMD="$CMD -Danypoint.environment=${{ steps.config.outputs.anypoint_environment }}"
+        CMD="$CMD -Danypoint.businessGroupId=${{ steps.config.outputs.anypoint_bg_id }}"
 
-        # Connected App auth (org-level secrets)
+        # Connected App auth
         CMD="$CMD -Dconnected.app.clientId=${INPUT_CONNECTED_APP_CLIENT_ID}"
         CMD="$CMD -Dconnected.app.clientSecret=${INPUT_CONNECTED_APP_CLIENT_SECRET}"
-        CMD="$CMD -Dconnected.app.grantType=${{ inputs.connected_app_grant_type }}"
+        CMD="$CMD -Dconnected.app.grantType=${{ steps.config.outputs.connected_app_grant_type }}"
 
-        # RTF target (org-level)
-        CMD="$CMD -Drtf.target=${{ inputs.rtf_target }}"
-
-        # RTF app config (resolved: input > file > default)
+        # RTF
+        CMD="$CMD -Drtf.target=${{ steps.config.outputs.rtf_target }}"
         CMD="$CMD -Drtf.provider=${{ steps.config.outputs.rtf_provider }}"
         CMD="$CMD -Drtf.applicationName=${{ steps.config.outputs.rtf_application_name }}"
         CMD="$CMD -Drtf.replicas=${{ steps.config.outputs.rtf_replicas }}"
@@ -216,7 +255,7 @@ runs:
         CMD="$CMD -Drtf.memoryReserved=${{ steps.config.outputs.rtf_memory_reserved }}"
         CMD="$CMD -Drtf.memoryMax=${{ steps.config.outputs.rtf_memory_max }}"
 
-        # Mule runtime (resolved)
+        # Mule runtime
         CMD="$CMD -Dmule.env=${{ steps.config.outputs.mule_env }}"
 
         # Mule encryption key (only if provided)
@@ -235,7 +274,7 @@ runs:
         echo "═══════════════════════════════════════════════════════"
         echo ""
         echo "Application: ${{ steps.config.outputs.rtf_application_name }}"
-        echo "Target:      ${{ inputs.rtf_target }}"
+        echo "Target:      ${{ steps.config.outputs.rtf_target }}"
         echo "Replicas:    ${{ steps.config.outputs.rtf_replicas }}"
         echo "CPU:         ${{ steps.config.outputs.rtf_cpu_reserved }} / ${{ steps.config.outputs.rtf_cpu_max }}"
         echo "Memory:      ${{ steps.config.outputs.rtf_memory_reserved }} / ${{ steps.config.outputs.rtf_memory_max }}"

@@ -30,27 +30,21 @@ on:
         type: string
         required: false
         default: ''
-      # ── Org-level (these would typically come from GitHub org vars) ──
       anypoint_uri:
         description: 'Anypoint Platform base URI'
         type: string
         required: false
         default: 'https://anypoint.mulesoft.com'
-      anypoint_business_group_id:
-        description: 'Anypoint business group ID'
-        type: string
-        required: true
-        default: 'gip'
-      rtf_target:
-        description: 'RTF cluster / target name'
-        type: string
-        required: true
-        default: 'gip-rtf-cluster'
 
 # ─────────────────────────────────────────────────────────────────
-# App-level values (replicas, CPU, memory, app name, etc.) are
-# loaded from:  <pom_file_path>/deploy/<environment>.properties
-# Any value can still be overridden via the composite action inputs.
+# Configuration layers:
+#   1. Org-level  — hardcoded in "Write org deploy properties" below
+#                   (same for every app in this org, varies per env)
+#   2. App-level  — loaded from <pom_path>/deploy/<env>.properties
+#                   (checked into the app repo)
+#   Org properties are written to a temp file at runtime and passed
+#   to the composite action.  The action merges both files with
+#   precedence: explicit input > org file > app file > defaults.
 # ─────────────────────────────────────────────────────────────────
 
 jobs:
@@ -71,6 +65,67 @@ jobs:
         with:
           ref: ${{ inputs.environment == 'dev' && inputs.branch || inputs.tag }}
 
+      # ── Org-specific configuration (hardcoded per environment) ───
+      - name: Write org deploy properties
+        id: org-config
+        run: |
+          ORG_PROPS_FILE="${RUNNER_TEMP}/org-deploy.properties"
+
+          case "${{ inputs.environment }}" in
+            dev)
+              cat > "$ORG_PROPS_FILE" <<'EOF'
+          # GIP Org — DEV environment
+          anypoint.environment=Development
+          anypoint.businessGroupId=gip
+          rtf.target=gip-rtf-cluster-dev
+          rtf.provider=MC
+          connected.app.grantType=client_credentials
+          mule.env=dev
+          EOF
+              ;;
+            sit)
+              cat > "$ORG_PROPS_FILE" <<'EOF'
+          # GIP Org — SIT environment
+          anypoint.environment=Sit
+          anypoint.businessGroupId=gip
+          rtf.target=gip-rtf-cluster-sit
+          rtf.provider=MC
+          connected.app.grantType=client_credentials
+          mule.env=sit
+          EOF
+              ;;
+            uat)
+              cat > "$ORG_PROPS_FILE" <<'EOF'
+          # GIP Org — UAT environment
+          anypoint.environment=Uat
+          anypoint.businessGroupId=gip
+          rtf.target=gip-rtf-cluster-uat
+          rtf.provider=MC
+          connected.app.grantType=client_credentials
+          mule.env=uat
+          EOF
+              ;;
+            prd)
+              cat > "$ORG_PROPS_FILE" <<'EOF'
+          # GIP Org — PRD environment
+          anypoint.environment=Production
+          anypoint.businessGroupId=gip
+          rtf.target=gip-rtf-cluster-prd
+          rtf.provider=MC
+          connected.app.grantType=client_credentials
+          mule.env=prd
+          EOF
+              ;;
+            *)
+              echo "::error::Unknown environment: ${{ inputs.environment }}"
+              exit 1
+              ;;
+          esac
+
+          echo "org_props_file=$ORG_PROPS_FILE" >> "$GITHUB_OUTPUT"
+          echo "📄 Org properties written to $ORG_PROPS_FILE"
+          cat "$ORG_PROPS_FILE"
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -88,13 +143,14 @@ jobs:
       - name: Deploy to RTF
         uses: ./.github/actions/mule-rtf-deploy
         with:
-          # Properties file — app-level defaults
-          deploy_properties_file: ${{ inputs.pom_file_path }}/deploy/${{ inputs.environment }}.properties
+          # Org-level config (written above)
+          deploy_properties_file: ${{ steps.org-config.outputs.org_props_file }}
+          # App-level config (from the app repo — merged by the action)
+          app_properties_file: ${{ inputs.pom_file_path }}/deploy/${{ inputs.environment }}.properties
           pom_file_path: ${{ inputs.pom_file_path }}
-          # Org-level values
+          # Org-level values that are always the same regardless of env
           anypoint_uri: ${{ inputs.anypoint_uri }}
-          anypoint_environment: ${{ inputs.environment }}
-          anypoint_business_group_id: ${{ inputs.anypoint_business_group_id }}
+          # Secrets (org-level)
           connected_app_client_id: ${{ secrets.CONNECTED_APP_CLIENT_ID }}
           connected_app_client_secret: ${{ secrets.CONNECTED_APP_CLIENT_SECRET }}
-          rtf_target: ${{ inputs.rtf_target }}
+          mule_key: ${{ secrets.MULE_KEY }}
