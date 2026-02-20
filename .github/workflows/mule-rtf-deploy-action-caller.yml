@@ -19,7 +19,7 @@ on:
         description: 'Path to the directory containing pom.xml'
         type: string
         required: false
-        default: 'java/my-app'
+        default: 'java/gs-rest-service/complete'
       branch:
         description: 'Branch to deploy (dev only)'
         type: string
@@ -40,11 +40,13 @@ on:
 # Configuration layers:
 #   1. Org-level  — hardcoded in "Write org deploy properties" below
 #                   (same for every app in this org, varies per env)
-#   2. App-level  — loaded from <pom_path>/deploy/<env>.properties
+#   2. App-level  — loaded from <pom_path>/deploy-properties/<env>.properties
 #                   (checked into the app repo)
-#   Org properties are written to a temp file at runtime and passed
-#   to the composite action.  The action merges both files with
-#   precedence: explicit input > org file > app file > defaults.
+#   Org properties are written to a temp file at runtime.  A merge
+#   step then combines app + org into one file (org values last so
+#   they override any duplicates).  The merged file is passed as
+#   app_properties_file; the org file is passed as deploy_properties_file.
+#   Precedence: explicit input > org file > merged app file > defaults.
 # ─────────────────────────────────────────────────────────────────
 
 jobs:
@@ -126,6 +128,29 @@ jobs:
           echo "📄 Org properties written to $ORG_PROPS_FILE"
           cat "$ORG_PROPS_FILE"
 
+      # ── Merge: app properties + org overrides ─────────────────────
+      - name: Merge deploy properties (org overrides app)
+        id: merge-config
+        run: |
+          APP_FILE="${{ inputs.pom_file_path }}/deploy-properties/${{ inputs.environment }}.properties"
+          ORG_FILE="${{ steps.org-config.outputs.org_props_file }}"
+          MERGED_FILE="${RUNNER_TEMP}/merged-deploy.properties"
+
+          # App properties first; org properties appended last so
+          # duplicate keys are overridden by org values (last-wins).
+          : > "$MERGED_FILE"
+          if [ -f "$APP_FILE" ]; then
+            cat "$APP_FILE" >> "$MERGED_FILE"
+            echo "" >> "$MERGED_FILE"
+          else
+            echo "::warning::App properties file not found: $APP_FILE"
+          fi
+          cat "$ORG_FILE" >> "$MERGED_FILE"
+
+          echo "merged_props_file=$MERGED_FILE" >> "$GITHUB_OUTPUT"
+          echo "📄 Merged deploy properties (org overrides app):"
+          cat "$MERGED_FILE"
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -145,8 +170,8 @@ jobs:
         with:
           # Org-level config (written above)
           deploy_properties_file: ${{ steps.org-config.outputs.org_props_file }}
-          # App-level config (from the app repo — merged by the action)
-          app_properties_file: ${{ inputs.pom_file_path }}/deploy/${{ inputs.environment }}.properties
+          # App-level config merged with org overrides (org values take priority)
+          app_properties_file: ${{ steps.merge-config.outputs.merged_props_file }}
           pom_file_path: ${{ inputs.pom_file_path }}
           # Org-level values that are always the same regardless of env
           anypoint_uri: ${{ inputs.anypoint_uri }}
