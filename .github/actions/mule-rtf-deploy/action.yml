@@ -200,6 +200,7 @@ runs:
       shell: bash
       run: |
         POM_DIR="${{ inputs.pom_file_path }}"
+        ls -lrta $POM_DIR
         if [ ! -f "$POM_DIR/pom.xml" ]; then
           echo "::error::pom.xml not found at $POM_DIR/pom.xml"
           exit 1
