@@ -102,10 +102,6 @@ inputs:
     description: '-Dmule.env  (defaults to anypoint.environment)'
     required: false
     default: ''
-  mule_key:
-    description: '-Dmule.key  (Mule encryption key — secret)'
-    required: false
-    default: ''
 
 runs:
   using: 'composite'

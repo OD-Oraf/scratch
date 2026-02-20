@@ -178,4 +178,3 @@ jobs:
           # Secrets (org-level)
           connected_app_client_id: ${{ secrets.CONNECTED_APP_CLIENT_ID }}
           connected_app_client_secret: ${{ secrets.CONNECTED_APP_CLIENT_SECRET }}
-          mule_key: ${{ secrets.MULE_KEY }}
