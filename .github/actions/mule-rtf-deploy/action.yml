@@ -199,8 +199,9 @@ runs:
     - name: Validate pom.xml path
       shell: bash
       run: |
+        pwd
+        ls -lrta
         POM_DIR="${{ inputs.pom_file_path }}"
-        ls -lrta $POM_DIR
         if [ ! -f "$POM_DIR/pom.xml" ]; then
           echo "::error::pom.xml not found at $POM_DIR/pom.xml"
           exit 1
