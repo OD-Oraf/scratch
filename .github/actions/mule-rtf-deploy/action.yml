@@ -201,6 +201,8 @@ runs:
       run: |
         pwd
         ls -lrta
+        ls -lrta java
+        
         POM_DIR="${{ inputs.pom_file_path }}"
         if [ ! -f "$POM_DIR/pom.xml" ]; then
           echo "::error::pom.xml not found at $POM_DIR/pom.xml"
