@@ -77,7 +77,7 @@ jobs:
             dev)
               cat > "$ORG_PROPS_FILE" <<'EOF'
           # GIP Org — DEV environment
-          anypoint.environment=Development
+          anypoint.environment=development
           anypoint.businessGroupId=gip
           rtf.target=gip-rtf-cluster-dev
           rtf.provider=MC
