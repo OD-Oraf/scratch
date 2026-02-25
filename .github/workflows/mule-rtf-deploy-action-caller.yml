@@ -110,7 +110,7 @@ jobs:
       - name: Deploy to RTF
         uses: ./.github/actions/mule-rtf-deploy
         with:
-          deploy_properties_file: ${{ inputs.pom_file_path }}/deploy-properties/${{ inputs.environment }}-properties
+          deploy_properties_file: ${{ inputs.pom_file_path }}/deploy-properties/${{ inputs.environment }}.properties
           pom_file_path: ${{ inputs.pom_file_path }}
           # Secrets
           connected_app_client_id: ${{ secrets.CONNECTED_APP_CLIENT_ID }}
