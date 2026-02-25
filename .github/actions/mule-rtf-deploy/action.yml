@@ -87,6 +87,68 @@ inputs:
     required: false
     default: ''
 
+  # ── deploymentSettings overrides (from RTF deploy reference) ───
+  enforce_deploying_replicas_across_nodes:
+    description: 'Override enforceDeployingReplicasAcrossNodes (true/false)'
+    required: false
+    default: ''
+  update_strategy:
+    description: 'Override updateStrategy (rolling/recreate)'
+    required: false
+    default: ''
+  clustered:
+    description: 'Override clustered (true/false)'
+    required: false
+    default: ''
+  http_inbound_public_url:
+    description: 'Override http.inbound.publicUrl'
+    required: false
+    default: ''
+  persistent_object_store:
+    description: 'Override persistentObjectStore (true/false)'
+    required: false
+    default: ''
+  jvm_args:
+    description: 'Override jvm.args (space-separated JVM arguments)'
+    required: false
+    default: ''
+  generate_default_public_url:
+    description: 'Override generateDefaultPublicUrl (true/false)'
+    required: false
+    default: ''
+  disable_am_log_forwarding:
+    description: 'Override disableAmLogForwarding (true/false)'
+    required: false
+    default: ''
+  autoscaling_enabled:
+    description: 'Override autoscaling.enabled (true/false)'
+    required: false
+    default: ''
+  autoscaling_min_replicas:
+    description: 'Override autoscaling.minReplicas'
+    required: false
+    default: ''
+  autoscaling_max_replicas:
+    description: 'Override autoscaling.maxReplicas'
+    required: false
+    default: ''
+  deployment_timeout:
+    description: 'Override deploymentTimeout (milliseconds)'
+    required: false
+    default: ''
+  mule_version:
+    description: 'Override muleVersion (e.g. 4.6.0 or 4.6.0:1e-java17)'
+    required: false
+    default: ''
+  release_channel:
+    description: 'Override releaseChannel (NONE/EDGE/LTS)'
+    required: false
+    default: ''
+  java_version:
+    description: 'Override javaVersion (8/17)'
+    required: false
+    default: ''
+
 runs:
   using: 'composite'
   steps:
@@ -112,6 +174,22 @@ runs:
         RTF_MEMORY_MAX: ${{ inputs.rtf_memory_max }}
         MULE_ENV: ${{ inputs.mule_env }}
         SKIP_TESTS: ${{ inputs.skip_tests }}
+        # deploymentSettings overrides
+        ENFORCE_DEPLOYING_REPLICAS_ACROSS_NODES: ${{ inputs.enforce_deploying_replicas_across_nodes }}
+        UPDATE_STRATEGY: ${{ inputs.update_strategy }}
+        CLUSTERED: ${{ inputs.clustered }}
+        HTTP_INBOUND_PUBLIC_URL: ${{ inputs.http_inbound_public_url }}
+        PERSISTENT_OBJECT_STORE: ${{ inputs.persistent_object_store }}
+        JVM_ARGS: ${{ inputs.jvm_args }}
+        GENERATE_DEFAULT_PUBLIC_URL: ${{ inputs.generate_default_public_url }}
+        DISABLE_AM_LOG_FORWARDING: ${{ inputs.disable_am_log_forwarding }}
+        AUTOSCALING_ENABLED: ${{ inputs.autoscaling_enabled }}
+        AUTOSCALING_MIN_REPLICAS: ${{ inputs.autoscaling_min_replicas }}
+        AUTOSCALING_MAX_REPLICAS: ${{ inputs.autoscaling_max_replicas }}
+        DEPLOYMENT_TIMEOUT: ${{ inputs.deployment_timeout }}
+        MULE_VERSION: ${{ inputs.mule_version }}
+        RELEASE_CHANNEL: ${{ inputs.release_channel }}
+        JAVA_VERSION: ${{ inputs.java_version }}
         MULE_KEY: ${{ inputs.mule_key }}
       run: python3 "$GITHUB_ACTION_PATH/resolve_config.py"
 

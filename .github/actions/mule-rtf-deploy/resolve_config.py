@@ -19,10 +19,12 @@ import sys
 # When a caller passes an action input, it arrives here as an env var.
 # If the env var has a value, it overrides the matching key from the file.
 OVERRIDES = {
+    # Anypoint Platform
     "ANYPOINT_URI":              "anypoint.uri",
     "ANYPOINT_ENVIRONMENT":      "anypoint.environment",
     "ANYPOINT_BUSINESS_GROUP_ID":"anypoint.businessGroupId",
     "CONNECTED_APP_GRANT_TYPE":  "connected.app.grantType",
+    # RTF top-level
     "RTF_TARGET":                "rtf.target",
     "RTF_PROVIDER":              "rtf.provider",
     "RTF_APPLICATION_NAME":      "rtf.applicationName",
@@ -31,8 +33,25 @@ OVERRIDES = {
     "RTF_CPU_MAX":               "rtf.cpuMax",
     "RTF_MEMORY_RESERVED":       "rtf.memoryReserved",
     "RTF_MEMORY_MAX":            "rtf.memoryMax",
+    # Mule runtime
     "MULE_ENV":                  "mule.env",
     "SKIP_TESTS":                "skipTests",
+    # deploymentSettings
+    "ENFORCE_DEPLOYING_REPLICAS_ACROSS_NODES": "enforceDeployingReplicasAcrossNodes",
+    "UPDATE_STRATEGY":           "updateStrategy",
+    "CLUSTERED":                 "clustered",
+    "HTTP_INBOUND_PUBLIC_URL":   "http.inbound.publicUrl",
+    "PERSISTENT_OBJECT_STORE":   "persistentObjectStore",
+    "JVM_ARGS":                  "jvm.args",
+    "GENERATE_DEFAULT_PUBLIC_URL":"generateDefaultPublicUrl",
+    "DISABLE_AM_LOG_FORWARDING": "disableAmLogForwarding",
+    "AUTOSCALING_ENABLED":       "autoscaling.enabled",
+    "AUTOSCALING_MIN_REPLICAS":  "autoscaling.minReplicas",
+    "AUTOSCALING_MAX_REPLICAS":  "autoscaling.maxReplicas",
+    "DEPLOYMENT_TIMEOUT":        "deploymentTimeout",
+    "MULE_VERSION":              "muleVersion",
+    "RELEASE_CHANNEL":           "releaseChannel",
+    "JAVA_VERSION":              "javaVersion",
 }
 
 # Secret keys — referenced as $SHELL_VARS in the command, redacted in logs
@@ -127,34 +146,35 @@ def print_summary(props, redacted_cmd):
 
 
 def main():
+    # Get POM and properteis files
     pom_file_path = os.environ.get("POM_FILE_PATH", "")
     props_file = os.environ.get("DEPLOY_PROPERTIES_FILE", "")
 
-    # Validate pom.xml
+    # Validate pom.xml to make sure it exists
     pom = pathlib.Path(pom_file_path) / "pom.xml"
     if not pom.is_file():
         print(f"::error::pom.xml not found at {pom}", file=sys.stderr)
         sys.exit(1)
     print(f"✓ Found pom.xml at {pom}")
 
-    # Load properties file — this IS the Maven config
+    # Load properties file
     props = load_properties(props_file)
     if not props:
         print("::error::No properties loaded — check DEPLOY_PROPERTIES_FILE", file=sys.stderr)
         sys.exit(1)
 
-    # Apply caller overrides (org/env-specific values)
+    # Override values defined in caller workflow
     print("\n📝 Applying caller overrides:")
     apply_overrides(props)
 
-    # Build Maven command
+    # Create maven arguments from properties file and overrides
     mvn_command = build_mvn_command(props, pom_file_path)
     mvn_command_redacted = redact_command(mvn_command)
 
     # Print summary
     print_summary(props, mvn_command_redacted)
 
-    # Write to GITHUB_OUTPUT
+    # Write to GitHub output variable to be used by subsequent steps
     output_file = os.environ.get("GITHUB_OUTPUT")
     if output_file:
         with open(output_file, "a") as out:
