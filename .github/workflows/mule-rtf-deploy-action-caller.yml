@@ -37,16 +37,10 @@ on:
         default: 'https://anypoint.mulesoft.com'
 
 # ─────────────────────────────────────────────────────────────────
-# Configuration layers:
-#   1. Org-level  — hardcoded in "Write org deploy properties" below
-#                   (same for every app in this org, varies per env)
-#   2. App-level  — loaded from <pom_path>/deploy-properties/<env>.properties
-#                   (checked into the app repo)
-#   Org properties are written to a temp file at runtime.  A merge
-#   step then combines app + org into one file (org values last so
-#   they override any duplicates).  The merged file is passed as
-#   app_properties_file; the org file is passed as deploy_properties_file.
-#   Precedence: explicit input > org file > merged app file > defaults.
+# The app's properties file (<pom_path>/deploy-properties/<env>.properties)
+# contains all Maven -D flags for the deployment.  The caller passes
+# org/env-specific overrides (anypoint.environment, rtf.target, etc.)
+# as action inputs — these take priority over the file values.
 # ─────────────────────────────────────────────────────────────────
 
 jobs:
@@ -67,90 +61,6 @@ jobs:
         with:
           ref: ${{ inputs.environment == 'dev' && inputs.branch || inputs.tag }}
 
-      # ── Org-specific configuration (hardcoded per environment) ───
-      - name: Write org deploy properties
-        id: org-config
-        run: |
-          ORG_PROPS_FILE="${RUNNER_TEMP}/org-deploy.properties"
-
-          case "${{ inputs.environment }}" in
-            dev)
-              cat > "$ORG_PROPS_FILE" <<'EOF'
-          # GIP Org — DEV environment
-          anypoint.environment=development
-          anypoint.businessGroupId=gip
-          rtf.target=gip-rtf-cluster-dev
-          rtf.provider=MC
-          connected.app.grantType=client_credentials
-          mule.env=dev
-          EOF
-              ;;
-            sit)
-              cat > "$ORG_PROPS_FILE" <<'EOF'
-          # GIP Org — SIT environment
-          anypoint.environment=Sit
-          anypoint.businessGroupId=gip
-          rtf.target=gip-rtf-cluster-sit
-          rtf.provider=MC
-          connected.app.grantType=client_credentials
-          mule.env=sit
-          EOF
-              ;;
-            uat)
-              cat > "$ORG_PROPS_FILE" <<'EOF'
-          # GIP Org — UAT environment
-          anypoint.environment=Uat
-          anypoint.businessGroupId=gip
-          rtf.target=gip-rtf-cluster-uat
-          rtf.provider=MC
-          connected.app.grantType=client_credentials
-          mule.env=uat
-          EOF
-              ;;
-            prd)
-              cat > "$ORG_PROPS_FILE" <<'EOF'
-          # GIP Org — PRD environment
-          anypoint.environment=Production
-          anypoint.businessGroupId=gip
-          rtf.target=gip-rtf-cluster-prd
-          rtf.provider=MC
-          connected.app.grantType=client_credentials
-          mule.env=prd
-          EOF
-              ;;
-            *)
-              echo "::error::Unknown environment: ${{ inputs.environment }}"
-              exit 1
-              ;;
-          esac
-
-          echo "org_props_file=$ORG_PROPS_FILE" >> "$GITHUB_OUTPUT"
-          echo "📄 Org properties written to $ORG_PROPS_FILE"
-          cat "$ORG_PROPS_FILE"
-
-      # ── Merge: app properties + org overrides ─────────────────────
-      - name: Merge deploy properties (org overrides app)
-        id: merge-config
-        run: |
-          APP_FILE="${{ inputs.pom_file_path }}/deploy-properties/${{ inputs.environment }}.properties"
-          ORG_FILE="${{ steps.org-config.outputs.org_props_file }}"
-          MERGED_FILE="${RUNNER_TEMP}/merged-deploy.properties"
-
-          # App properties first; org properties appended last so
-          # duplicate keys are overridden by org values (last-wins).
-          : > "$MERGED_FILE"
-          if [ -f "$APP_FILE" ]; then
-            cat "$APP_FILE" >> "$MERGED_FILE"
-            echo "" >> "$MERGED_FILE"
-          else
-            echo "::warning::App properties file not found: $APP_FILE"
-          fi
-          cat "$ORG_FILE" >> "$MERGED_FILE"
-
-          echo "merged_props_file=$MERGED_FILE" >> "$GITHUB_OUTPUT"
-          echo "📄 Merged deploy properties (org overrides app):"
-          cat "$MERGED_FILE"
-
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -165,16 +75,21 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
+      # ── Deploy — properties file is the base, inputs override ───
       - name: Deploy to RTF
         uses: ./.github/actions/mule-rtf-deploy
         with:
-          # Org-level config (written above)
-          deploy_properties_file: ${{ steps.org-config.outputs.org_props_file }}
-          # App-level config merged with org overrides (org values take priority)
-          app_properties_file: ${{ steps.merge-config.outputs.merged_props_file }}
+          deploy_properties_file: ${{ inputs.pom_file_path }}/deploy-properties/${{ inputs.environment }}.properties
           pom_file_path: ${{ inputs.pom_file_path }}
-          # Org-level values that are always the same regardless of env
-          anypoint_uri: ${{ inputs.anypoint_uri }}
-          # Secrets (org-level)
+          # Secrets
           connected_app_client_id: ${{ secrets.CONNECTED_APP_CLIENT_ID }}
           connected_app_client_secret: ${{ secrets.CONNECTED_APP_CLIENT_SECRET }}
+          mule_key: ${{ secrets.MULE_KEY }}
+          # ── GIP Org overrides (env-specific) ──────────────────────
+          anypoint_uri: ${{ inputs.anypoint_uri }}
+          anypoint_environment: ${{ vars[format('{0}_ANYPOINT_ENVIRONMENT', inputs.environment)] }}
+          anypoint_business_group_id: ${{ vars.ANYPOINT_BUSINESS_GROUP_ID }}
+          rtf_target: ${{ vars[format('{0}_RTF_TARGET', inputs.environment)] }}
+          rtf_provider: ${{ vars.RTF_PROVIDER }}
+          connected_app_grant_type: ${{ vars.CONNECTED_APP_GRANT_TYPE }}
+          mule_env: ${{ inputs.environment }}
