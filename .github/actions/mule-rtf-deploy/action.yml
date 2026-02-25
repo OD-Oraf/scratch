@@ -8,8 +8,9 @@ description: |
 inputs:
   # ── Deploy config ───────────────────────────────────────────────
   deploy_properties_file:
-    description: 'Path to properties file with Maven -D key=value pairs'
-    required: true
+    description: 'Path to deploy properties file (e.g. deploy-properties/dev-properties)'
+    required: false
+    default: 'deploy-properties/dev-properties'
   pom_file_path:
     description: 'Path to the directory containing pom.xml'
     required: false

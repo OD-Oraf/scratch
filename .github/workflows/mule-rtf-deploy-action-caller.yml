@@ -75,17 +75,48 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
+      # ── Set env-specific overrides ──────────────────────────────
+      - name: Set environment overrides
+        id: env-overrides
+        run: |
+          case "${{ inputs.environment }}" in
+            dev)
+              echo "rtf_cpu_reserved=500m"   >> "$GITHUB_OUTPUT"
+              echo "rtf_cpu_max=1000m"       >> "$GITHUB_OUTPUT"
+              echo "rtf_memory_reserved=700Mi" >> "$GITHUB_OUTPUT"
+              echo "rtf_memory_max=1000Mi"   >> "$GITHUB_OUTPUT"
+              ;;
+            sit)
+              echo "rtf_cpu_reserved=500m"   >> "$GITHUB_OUTPUT"
+              echo "rtf_cpu_max=1000m"       >> "$GITHUB_OUTPUT"
+              echo "rtf_memory_reserved=700Mi" >> "$GITHUB_OUTPUT"
+              echo "rtf_memory_max=1000Mi"   >> "$GITHUB_OUTPUT"
+              ;;
+            uat)
+              echo "rtf_cpu_reserved=750m"   >> "$GITHUB_OUTPUT"
+              echo "rtf_cpu_max=1500m"       >> "$GITHUB_OUTPUT"
+              echo "rtf_memory_reserved=1000Mi" >> "$GITHUB_OUTPUT"
+              echo "rtf_memory_max=1500Mi"   >> "$GITHUB_OUTPUT"
+              ;;
+            prd)
+              echo "rtf_cpu_reserved=1000m"  >> "$GITHUB_OUTPUT"
+              echo "rtf_cpu_max=2000m"       >> "$GITHUB_OUTPUT"
+              echo "rtf_memory_reserved=1500Mi" >> "$GITHUB_OUTPUT"
+              echo "rtf_memory_max=2000Mi"   >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
       # ── Deploy — properties file is the base, inputs override ───
       - name: Deploy to RTF
         uses: ./.github/actions/mule-rtf-deploy
         with:
-          deploy_properties_file: ${{ inputs.pom_file_path }}/deploy-properties/${{ inputs.environment }}.properties
+          deploy_properties_file: ${{ inputs.pom_file_path }}/deploy-properties/${{ inputs.environment }}-properties
           pom_file_path: ${{ inputs.pom_file_path }}
           # Secrets
           connected_app_client_id: ${{ secrets.CONNECTED_APP_CLIENT_ID }}
           connected_app_client_secret: ${{ secrets.CONNECTED_APP_CLIENT_SECRET }}
           mule_key: ${{ secrets.MULE_KEY }}
-          # ── GIP Org overrides (env-specific) ──────────────────────
+          # ── Org/env overrides ────────────────────────────────────────
           anypoint_uri: ${{ inputs.anypoint_uri }}
           anypoint_environment: ${{ vars[format('{0}_ANYPOINT_ENVIRONMENT', inputs.environment)] }}
           anypoint_business_group_id: ${{ vars.ANYPOINT_BUSINESS_GROUP_ID }}
@@ -93,3 +124,8 @@ jobs:
           rtf_provider: ${{ vars.RTF_PROVIDER }}
           connected_app_grant_type: ${{ vars.CONNECTED_APP_GRANT_TYPE }}
           mule_env: ${{ inputs.environment }}
+          # ── Env-specific resource overrides ──────────────────────────
+          rtf_cpu_reserved: ${{ steps.env-overrides.outputs.rtf_cpu_reserved }}
+          rtf_cpu_max: ${{ steps.env-overrides.outputs.rtf_cpu_max }}
+          rtf_memory_reserved: ${{ steps.env-overrides.outputs.rtf_memory_reserved }}
+          rtf_memory_max: ${{ steps.env-overrides.outputs.rtf_memory_max }}
