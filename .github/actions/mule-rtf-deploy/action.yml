@@ -106,94 +106,92 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    # ── Step 1: Load app-level properties file ─────────────────
-    - name: Load app properties file
-      id: app-props
-      shell: bash
-      run: |
-        PROPS_FILE="${{ inputs.app_properties_file }}"
-        if [ -n "$PROPS_FILE" ] && [ -f "$PROPS_FILE" ]; then
-          echo "📄 Loading app properties from $PROPS_FILE"
-          while IFS='=' read -r key value; do
-            [[ -z "$key" || "$key" == \#* || "$key" == \[* ]] && continue
-            key=$(echo "$key" | xargs)
-            value=$(echo "$value" | xargs)
-            echo "  $key=$value"
-            echo "$key=$value" >> "$GITHUB_OUTPUT"
-          done < "$PROPS_FILE"
-        else
-          echo "ℹ️  No app properties file — skipping"
-        fi
-
-    # ── Step 2: Load org-level properties file ─────────────────
-    - name: Load org properties file
-      id: org-props
-      shell: bash
-      run: |
-        PROPS_FILE="${{ inputs.deploy_properties_file }}"
-        if [ -n "$PROPS_FILE" ] && [ -f "$PROPS_FILE" ]; then
-          echo "📄 Loading org properties from $PROPS_FILE"
-          while IFS='=' read -r key value; do
-            [[ -z "$key" || "$key" == \#* || "$key" == \[* ]] && continue
-            key=$(echo "$key" | xargs)
-            value=$(echo "$value" | xargs)
-            echo "  $key=$value"
-            echo "$key=$value" >> "$GITHUB_OUTPUT"
-          done < "$PROPS_FILE"
-        else
-          echo "ℹ️  No org properties file — skipping"
-        fi
-
-    # ── Step 3: Resolve final config ───────────────────────────
+    # ── Step 1: Load properties files & resolve config ─────────
     #   Precedence: explicit input > org file > app file > default
-    - name: Resolve configuration
+    - name: Resolve deploy configuration
       id: config
-      shell: bash
+      shell: python3 {0}
+      env:
+        APP_PROPS_FILE: ${{ inputs.app_properties_file }}
+        ORG_PROPS_FILE: ${{ inputs.deploy_properties_file }}
+        # Explicit inputs (highest priority)
+        ANYPOINT_ENVIRONMENT: ${{ inputs.anypoint_environment }}
+        ANYPOINT_BUSINESS_GROUP_ID: ${{ inputs.anypoint_business_group_id }}
+        CONNECTED_APP_GRANT_TYPE: ${{ inputs.connected_app_grant_type }}
+        RTF_TARGET: ${{ inputs.rtf_target }}
+        RTF_PROVIDER: ${{ inputs.rtf_provider }}
+        RTF_APPLICATION_NAME: ${{ inputs.rtf_application_name }}
+        RTF_REPLICAS: ${{ inputs.rtf_replicas }}
+        RTF_CPU_RESERVED: ${{ inputs.rtf_cpu_reserved }}
+        RTF_CPU_MAX: ${{ inputs.rtf_cpu_max }}
+        RTF_MEMORY_RESERVED: ${{ inputs.rtf_memory_reserved }}
+        RTF_MEMORY_MAX: ${{ inputs.rtf_memory_max }}
+        MULE_ENV: ${{ inputs.mule_env }}
+        SKIP_TESTS: ${{ inputs.skip_tests }}
       run: |
-        resolve() {
-          for val in "$@"; do
-            if [ -n "$val" ]; then echo "$val"; return; fi
-          done
+        import os, pathlib
+
+        def load_properties(path):
+            """Parse a key=value properties file, skipping comments and blanks."""
+            props = {}
+            p = pathlib.Path(path) if path else None
+            if not p or not p.is_file():
+                return props
+            print(f"📄 Loading properties from {path}")
+            for line in p.read_text().splitlines():
+                line = line.strip()
+                if not line or line.startswith("#") or line.startswith("["):
+                    continue
+                key, _, value = line.partition("=")
+                key, value = key.strip(), value.strip()
+                if key:
+                    props[key] = value
+                    print(f"  {key}={value}")
+            return props
+
+        # ── Load files (lower layers first, higher layers overwrite) ──
+        app = load_properties(os.environ.get("APP_PROPS_FILE", ""))
+        org = load_properties(os.environ.get("ORG_PROPS_FILE", ""))
+
+        # ── Map: output_key → (properties-file key, env var for explicit input, default) ──
+        config_map = {
+            "anypoint_environment":    ("anypoint.environment",      "ANYPOINT_ENVIRONMENT",      ""),
+            "anypoint_bg_id":          ("anypoint.businessGroupId",  "ANYPOINT_BUSINESS_GROUP_ID", ""),
+            "connected_app_grant_type":("connected.app.grantType",   "CONNECTED_APP_GRANT_TYPE",  "client_credentials"),
+            "rtf_target":              ("rtf.target",                "RTF_TARGET",                ""),
+            "rtf_provider":            ("rtf.provider",              "RTF_PROVIDER",              "MC"),
+            "rtf_application_name":    ("rtf.applicationName",       "RTF_APPLICATION_NAME",      ""),
+            "rtf_replicas":            ("rtf.replicas",              "RTF_REPLICAS",              "1"),
+            "rtf_cpu_reserved":        ("rtf.cpuReserved",           "RTF_CPU_RESERVED",          "500m"),
+            "rtf_cpu_max":             ("rtf.cpuMax",                "RTF_CPU_MAX",               "1000m"),
+            "rtf_memory_reserved":     ("rtf.memoryReserved",        "RTF_MEMORY_RESERVED",       "700Mi"),
+            "rtf_memory_max":          ("rtf.memoryMax",             "RTF_MEMORY_MAX",            "1000Mi"),
+            "skip_tests":              ("skipTests",                 "SKIP_TESTS",                "true"),
+            "mule_env":                ("mule.env",                  "MULE_ENV",                  ""),
         }
 
-        # Org-level file values
-        ORG_AP_ENV="${{ steps.org-props.outputs.anypoint.environment }}"
-        ORG_BG_ID="${{ steps.org-props.outputs.anypoint.businessGroupId }}"
-        ORG_RTF_TARGET="${{ steps.org-props.outputs.rtf.target }}"
-        ORG_RTF_PROVIDER="${{ steps.org-props.outputs.rtf.provider }}"
-        ORG_GRANT_TYPE="${{ steps.org-props.outputs.connected.app.grantType }}"
-        ORG_MULE_ENV="${{ steps.org-props.outputs.mule.env }}"
+        output_file = os.environ["GITHUB_OUTPUT"]
+        resolved = {}
 
-        # App-level file values
-        APP_NAME="${{ steps.app-props.outputs.rtf.applicationName }}"
-        APP_REPLICAS="${{ steps.app-props.outputs.rtf.replicas }}"
-        APP_CPU_RESERVED="${{ steps.app-props.outputs.rtf.cpuReserved }}"
-        APP_CPU_MAX="${{ steps.app-props.outputs.rtf.cpuMax }}"
-        APP_MEM_RESERVED="${{ steps.app-props.outputs.rtf.memoryReserved }}"
-        APP_MEM_MAX="${{ steps.app-props.outputs.rtf.memoryMax }}"
-        APP_PROVIDER="${{ steps.app-props.outputs.rtf.provider }}"
-        APP_MULE_ENV="${{ steps.app-props.outputs.mule.env }}"
-        APP_SKIP_TESTS="${{ steps.app-props.outputs.skipTests }}"
+        with open(output_file, "a") as out:
+            for output_key, (prop_key, env_key, default) in config_map.items():
+                # Precedence: explicit input > org file > app file > default
+                explicit = os.environ.get(env_key, "").strip()
+                org_val  = org.get(prop_key, "")
+                app_val  = app.get(prop_key, "")
+                value    = explicit or org_val or app_val or default
+                resolved[output_key] = value
+                out.write(f"{output_key}={value}\n")
 
-        # Resolve: input → org file → app file → hardcoded default
-        echo "anypoint_environment=$(resolve  '${{ inputs.anypoint_environment }}'  "$ORG_AP_ENV")" >> "$GITHUB_OUTPUT"
-        echo "anypoint_bg_id=$(resolve        '${{ inputs.anypoint_business_group_id }}' "$ORG_BG_ID")" >> "$GITHUB_OUTPUT"
-        echo "rtf_target=$(resolve            '${{ inputs.rtf_target }}'            "$ORG_RTF_TARGET")" >> "$GITHUB_OUTPUT"
-        echo "connected_app_grant_type=$(resolve '${{ inputs.connected_app_grant_type }}' "$ORG_GRANT_TYPE" 'client_credentials')" >> "$GITHUB_OUTPUT"
-        echo "rtf_provider=$(resolve          '${{ inputs.rtf_provider }}'          "$ORG_RTF_PROVIDER" "$APP_PROVIDER" 'MC')" >> "$GITHUB_OUTPUT"
-        echo "rtf_application_name=$(resolve  '${{ inputs.rtf_application_name }}'  "$APP_NAME")" >> "$GITHUB_OUTPUT"
-        echo "rtf_replicas=$(resolve          '${{ inputs.rtf_replicas }}'          "$APP_REPLICAS" '1')" >> "$GITHUB_OUTPUT"
-        echo "rtf_cpu_reserved=$(resolve      '${{ inputs.rtf_cpu_reserved }}'      "$APP_CPU_RESERVED" '500m')" >> "$GITHUB_OUTPUT"
-        echo "rtf_cpu_max=$(resolve           '${{ inputs.rtf_cpu_max }}'           "$APP_CPU_MAX" '1000m')" >> "$GITHUB_OUTPUT"
-        echo "rtf_memory_reserved=$(resolve   '${{ inputs.rtf_memory_reserved }}'   "$APP_MEM_RESERVED" '700Mi')" >> "$GITHUB_OUTPUT"
-        echo "rtf_memory_max=$(resolve        '${{ inputs.rtf_memory_max }}'        "$APP_MEM_MAX" '1000Mi')" >> "$GITHUB_OUTPUT"
-        echo "skip_tests=$(resolve            '${{ inputs.skip_tests }}'            "$APP_SKIP_TESTS" 'true')" >> "$GITHUB_OUTPUT"
+            # Special case: mule_env falls back to resolved anypoint_environment
+            if not resolved["mule_env"]:
+                resolved["mule_env"] = resolved["anypoint_environment"]
+                out.write(f"mule_env={resolved['mule_env']}\n")
 
-        # mule.env: input → org file → app file → anypoint_environment
-        RESOLVED_AP_ENV=$(resolve '${{ inputs.anypoint_environment }}' "$ORG_AP_ENV")
-        echo "mule_env=$(resolve '${{ inputs.mule_env }}' "$ORG_MULE_ENV" "$APP_MULE_ENV" "$RESOLVED_AP_ENV")" >> "$GITHUB_OUTPUT"
-
-        echo "✓ Configuration resolved (input > org file > app file > default)"
+        # ── Summary ──
+        print("\n✓ Configuration resolved (input > org file > app file > default)")
+        for k, v in resolved.items():
+            print(f"  {k}={v}")
 
     # ── Step 4: Validate pom.xml ───────────────────────────────
     - name: Validate pom.xml path
