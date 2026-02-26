@@ -100,7 +100,24 @@ resource "aws_s3_bucket" "transfer" {
     Name        = "esb-to-ace"
     Environment = "dev"
   }
+
+
 }
+resource "aws_s3_bucket_lifecycle_configuration" "bucket-config" {
+  bucket = aws_s3_bucket.transfer.bucket
+
+  rule {
+    id = "7-day-expiration-rule"
+
+    expiration {
+      days = 7
+    }
+
+    status = "Enabled"
+
+  }
+}
+
 
 resource "aws_iam_role_policy" "s3_transfer" {
   name = "esb-s3-transfer"
