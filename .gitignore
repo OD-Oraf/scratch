@@ -9,3 +9,8 @@ __pycache__
 .secrets
 
 gh-cli/archive-*
+
+terraform/.*
+terraform/*.pkg
+terraform/terraform*
+target/
