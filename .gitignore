@@ -12,5 +12,5 @@ gh-cli/archive-*
 
 terraform/.*
 terraform/*.pkg
-terraform/terraform*
+terraform/terraform.*
 target/
