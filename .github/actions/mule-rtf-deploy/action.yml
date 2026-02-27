@@ -89,7 +89,7 @@ inputs:
 
   # ── deploymentSettings overrides (from RTF deploy reference) ───
   enforce_deploying_replicas_across_nodes:
-    description: 'Override enforceDeployingReplicasAcrossNodes (true/false)'
+    description: 'Override rtf.enforceDeployingReplicasAcrossNodes (true/false)'
     required: false
     default: ''
   update_strategy:
@@ -109,7 +109,7 @@ inputs:
     required: false
     default: ''
   jvm_args:
-    description: 'Override jvm.args (space-separated JVM arguments)'
+    description: 'Override rtf.jvm.args (space-separated JVM arguments)'
     required: false
     default: ''
   generate_default_public_url:
