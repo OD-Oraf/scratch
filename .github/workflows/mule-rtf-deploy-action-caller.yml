@@ -30,17 +30,40 @@ on:
         type: string
         required: false
         default: ''
-      anypoint_uri:
-        description: 'Anypoint Platform base URI'
+
+      rtf_cpu_reserved:
+        description: 'CPU reserved override (default: env-tier standard)'
         type: string
         required: false
-        default: 'https://anypoint.mulesoft.com'
+        default: ''
+      rtf_cpu_max:
+        description: 'CPU max override (default: env-tier standard)'
+        type: string
+        required: false
+        default: ''
+      rtf_memory_reserved:
+        description: 'Memory reserved override (default: env-tier standard)'
+        type: string
+        required: false
+        default: ''
+      rtf_memory_max:
+        description: 'Memory max override (default: env-tier standard)'
+        type: string
+        required: false
+        default: ''
 
+env:
+  anypoint_uri: 'https://anypoint.mulesoft.com'
 # ─────────────────────────────────────────────────────────────────
-# The app's properties file (<pom_path>/deploy-properties/<env>.properties)
-# contains all Maven -D flags for the deployment.  The caller passes
-# org/env-specific overrides (anypoint.environment, rtf.target, etc.)
-# as action inputs — these take priority over the file values.
+# Three-tier override hierarchy (each tier wins over the one below):
+#   1. Dispatch inputs       — per-run overrides (e.g. load testing)
+#   2. Caller case statement — org-wide resource standards per env tier
+#   3. Properties file       — app-level defaults & identity
+#      (<pom_path>/deploy-properties/<env>.properties)
+#
+# App teams own: rtf.applicationName, rtf.replicas, mule.env, skipTests
+# Org standards: CPU/memory limits enforced centrally via this workflow
+# Per-run:       any resource input passed at dispatch time
 # ─────────────────────────────────────────────────────────────────
 
 jobs:
@@ -50,12 +73,6 @@ jobs:
     environment: ${{ inputs.environment }}
 
     steps:
-      - name: Validate tag for non-dev environments
-        if: ${{ inputs.environment != 'dev' && inputs.tag == '' }}
-        run: |
-          echo "::error::Tag is required for non-dev environments (environment=${{ inputs.environment }})"
-          exit 1
-
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -75,40 +92,37 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
-      # ── Set env-specific overrides ──────────────────────────────
-      - name: Set environment overrides
+      # ── Resolve resource limits (tier defaults → dispatch overrides) ──
+      - name: Resolve resource limits
         id: env-overrides
+        env:
+          INPUT_CPU_RESERVED:  ${{ inputs.rtf_cpu_reserved }}
+          INPUT_CPU_MAX:       ${{ inputs.rtf_cpu_max }}
+          INPUT_MEM_RESERVED:  ${{ inputs.rtf_memory_reserved }}
+          INPUT_MEM_MAX:       ${{ inputs.rtf_memory_max }}
         run: |
+          # Org-wide tier defaults
           case "${{ inputs.environment }}" in
-            dev)
-              echo "rtf_cpu_reserved=500m"   >> "$GITHUB_OUTPUT"
-              echo "rtf_cpu_max=1000m"       >> "$GITHUB_OUTPUT"
-              echo "rtf_memory_reserved=700Mi" >> "$GITHUB_OUTPUT"
-              echo "rtf_memory_max=1000Mi"   >> "$GITHUB_OUTPUT"
-              ;;
-            sit)
-              echo "rtf_cpu_reserved=500m"   >> "$GITHUB_OUTPUT"
-              echo "rtf_cpu_max=1000m"       >> "$GITHUB_OUTPUT"
-              echo "rtf_memory_reserved=700Mi" >> "$GITHUB_OUTPUT"
-              echo "rtf_memory_max=1000Mi"   >> "$GITHUB_OUTPUT"
-              ;;
-            uat)
-              echo "rtf_cpu_reserved=750m"   >> "$GITHUB_OUTPUT"
-              echo "rtf_cpu_max=1500m"       >> "$GITHUB_OUTPUT"
-              echo "rtf_memory_reserved=1000Mi" >> "$GITHUB_OUTPUT"
-              echo "rtf_memory_max=1500Mi"   >> "$GITHUB_OUTPUT"
-              ;;
-            prd)
-              echo "rtf_cpu_reserved=1000m"  >> "$GITHUB_OUTPUT"
-              echo "rtf_cpu_max=2000m"       >> "$GITHUB_OUTPUT"
-              echo "rtf_memory_reserved=1500Mi" >> "$GITHUB_OUTPUT"
-              echo "rtf_memory_max=2000Mi"   >> "$GITHUB_OUTPUT"
-              ;;
+            dev)     CPU_RESERVED=500m  CPU_MAX=1000m  MEM_RESERVED=700Mi  MEM_MAX=1000Mi ;;
+            sit)     CPU_RESERVED=500m  CPU_MAX=1000m  MEM_RESERVED=700Mi  MEM_MAX=1000Mi ;;
+            uat)     CPU_RESERVED=750m  CPU_MAX=1500m  MEM_RESERVED=1000Mi MEM_MAX=1500Mi ;;
+            prd)     CPU_RESERVED=1000m CPU_MAX=2000m  MEM_RESERVED=1500Mi MEM_MAX=2000Mi ;;
           esac
+
+          # Per-run dispatch inputs win when provided
+          [ -n "$INPUT_CPU_RESERVED" ] && CPU_RESERVED="$INPUT_CPU_RESERVED"
+          [ -n "$INPUT_CPU_MAX" ]      && CPU_MAX="$INPUT_CPU_MAX"
+          [ -n "$INPUT_MEM_RESERVED" ] && MEM_RESERVED="$INPUT_MEM_RESERVED"
+          [ -n "$INPUT_MEM_MAX" ]      && MEM_MAX="$INPUT_MEM_MAX"
+
+          echo "rtf_cpu_reserved=$CPU_RESERVED"    >> "$GITHUB_OUTPUT"
+          echo "rtf_cpu_max=$CPU_MAX"              >> "$GITHUB_OUTPUT"
+          echo "rtf_memory_reserved=$MEM_RESERVED" >> "$GITHUB_OUTPUT"
+          echo "rtf_memory_max=$MEM_MAX"           >> "$GITHUB_OUTPUT"
 
       # ── Deploy — properties file is the base, inputs override ───
       - name: Deploy to RTF
-        uses: ./.github/actions/mule-rtf-deploy
+        uses: OD-ORaf/scratch/.github/actions/mule-rtf-deploy
         with:
           deploy_properties_file: ${{ inputs.pom_file_path }}/deploy-properties/${{ inputs.environment }}.properties
           pom_file_path: ${{ inputs.pom_file_path }}
