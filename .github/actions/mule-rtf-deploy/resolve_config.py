@@ -146,7 +146,7 @@ def print_summary(props, redacted_cmd):
 
 
 def main():
-    # Get POM and properteis files
+    # Get POM and properties files
     pom_file_path = os.environ.get("POM_FILE_PATH", "")
     props_file = os.environ.get("DEPLOY_PROPERTIES_FILE", "")
 
