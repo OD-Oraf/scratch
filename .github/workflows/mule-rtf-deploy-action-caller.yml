@@ -122,7 +122,7 @@ jobs:
 
       # ── Deploy — properties file is the base, inputs override ───
       - name: Deploy to RTF
-        uses: OD-ORaf/scratch/.github/actions/mule-rtf-deploy
+        uses: OD-ORaf/scratch/.github/actions/mule-rtf-deploy@develop
         with:
           deploy_properties_file: ${{ inputs.pom_file_path }}/deploy-properties/${{ inputs.environment }}.properties
           pom_file_path: ${{ inputs.pom_file_path }}
