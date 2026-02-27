@@ -200,5 +200,6 @@ runs:
         CONNECTED_APP_CLIENT_ID: ${{ inputs.connected_app_client_id }}
         CONNECTED_APP_CLIENT_SECRET: ${{ inputs.connected_app_client_secret }}
         MULE_KEY: ${{ inputs.mule_key }}
+        MVN_COMMAND: ${{ steps.config.outputs.mvn_command }}
       run: |
-        eval "${{ steps.config.outputs.mvn_command }}"
+        eval "$MVN_COMMAND"
