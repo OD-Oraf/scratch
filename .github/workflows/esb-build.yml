@@ -1,0 +1,92 @@
+name: ESB Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact_name:
+        description: 'Name of the artifact file to build'
+        required: true
+        default: 'app-artifact.jar'
+      artifact_version:
+        description: 'Version tag for the artifact'
+        required: true
+        default: '1.0.0'
+
+env:
+  AWS_REGION: us-east-1
+  S3_BUCKET: esb-to-ace-transfer
+  ESB_BUILD_INSTANCE_ID: ${{ vars.ESB_BUILD_INSTANCE_ID }}
+  IAM_ROLE_ARN: ${{ secrets.ESB_SSM_ROLE_ARN }}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-upload:
+    name: Build artifact and upload to S3
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.IAM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build artifact on esb-build instance
+        id: build
+        run: |
+          S3_KEY="${{ inputs.artifact_name }}-${{ inputs.artifact_version }}"
+          echo "s3_key=${S3_KEY}" >> "$GITHUB_OUTPUT"
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "${{ env.ESB_BUILD_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --parameters "commands=[
+              \"echo 'Building artifact: ${{ inputs.artifact_name }} v${{ inputs.artifact_version }}'\",
+              \"mkdir -p /tmp/build\",
+              \"echo 'placeholder build output' > /tmp/build/${{ inputs.artifact_name }}\",
+              \"aws s3 cp /tmp/build/${{ inputs.artifact_name }} s3://${{ env.S3_BUCKET }}/${S3_KEY}\",
+              \"echo 'Upload complete: s3://${{ env.S3_BUCKET }}/${S3_KEY}'\"]" \
+            --output text \
+            --query "Command.CommandId")
+
+          echo "command_id=${COMMAND_ID}" >> "$GITHUB_OUTPUT"
+          echo "::notice::SSM Command ID: ${COMMAND_ID}"
+
+      - name: Wait for build to complete
+        run: |
+          echo "Waiting for SSM command ${{ steps.build.outputs.command_id }} to finish..."
+          aws ssm wait command-executed \
+            --command-id "${{ steps.build.outputs.command_id }}" \
+            --instance-id "${{ env.ESB_BUILD_INSTANCE_ID }}" || true
+
+          STATUS=$(aws ssm get-command-invocation \
+            --command-id "${{ steps.build.outputs.command_id }}" \
+            --instance-id "${{ env.ESB_BUILD_INSTANCE_ID }}" \
+            --query "Status" --output text)
+
+          echo "Command status: ${STATUS}"
+          if [ "$STATUS" != "Success" ]; then
+            echo "::error::SSM command failed with status: ${STATUS}"
+            aws ssm get-command-invocation \
+              --command-id "${{ steps.build.outputs.command_id }}" \
+              --instance-id "${{ env.ESB_BUILD_INSTANCE_ID }}" \
+              --query "StandardErrorContent" --output text
+            exit 1
+          fi
+
+          aws ssm get-command-invocation \
+            --command-id "${{ steps.build.outputs.command_id }}" \
+            --instance-id "${{ env.ESB_BUILD_INSTANCE_ID }}" \
+            --query "StandardOutputContent" --output text
+
+      - name: Verify artifact in S3
+        run: |
+          echo "Verifying s3://${{ env.S3_BUCKET }}/${{ steps.build.outputs.s3_key }}"
+          aws s3 ls "s3://${{ env.S3_BUCKET }}/${{ steps.build.outputs.s3_key }}"
+          echo "✅ Artifact uploaded successfully"

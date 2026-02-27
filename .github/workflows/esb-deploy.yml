@@ -1,0 +1,103 @@
+name: ESB Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact_name:
+        description: 'Name of the artifact file to deploy'
+        required: true
+        default: 'app-artifact.jar'
+      artifact_version:
+        description: 'Version tag of the artifact to deploy'
+        required: true
+        default: '1.0.0'
+      deploy_path:
+        description: 'Target path on the esb-deploy instance'
+        required: false
+        default: '/opt/app'
+
+env:
+  AWS_REGION: us-east-1
+  S3_BUCKET: esb-to-ace-transfer
+  ESB_DEPLOY_INSTANCE_ID: ${{ vars.ESB_DEPLOY_INSTANCE_ID }}
+  IAM_ROLE_ARN: ${{ secrets.ESB_SSM_ROLE_ARN }}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  download-and-deploy:
+    name: Download from S3 and deploy to EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.IAM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify artifact exists in S3
+        id: artifact
+        run: |
+          S3_KEY="${{ inputs.artifact_name }}-${{ inputs.artifact_version }}"
+          echo "s3_key=${S3_KEY}" >> "$GITHUB_OUTPUT"
+
+          echo "Checking s3://${{ env.S3_BUCKET }}/${S3_KEY}"
+          if ! aws s3 ls "s3://${{ env.S3_BUCKET }}/${S3_KEY}"; then
+            echo "::error::Artifact not found in S3: ${S3_KEY}"
+            exit 1
+          fi
+          echo "✅ Artifact found"
+
+      - name: Deploy artifact to esb-deploy instance
+        id: deploy
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "${{ env.ESB_DEPLOY_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --parameters "commands=[
+              \"echo 'Deploying: ${{ inputs.artifact_name }} v${{ inputs.artifact_version }}'\",
+              \"mkdir -p ${{ inputs.deploy_path }}\",
+              \"aws s3 cp s3://${{ env.S3_BUCKET }}/${{ steps.artifact.outputs.s3_key }} ${{ inputs.deploy_path }}/${{ inputs.artifact_name }}\",
+              \"echo 'Downloaded to ${{ inputs.deploy_path }}/${{ inputs.artifact_name }}'\",
+              \"ls -la ${{ inputs.deploy_path }}/${{ inputs.artifact_name }}\",
+              \"echo 'Deploy complete'\"]" \
+            --output text \
+            --query "Command.CommandId")
+
+          echo "command_id=${COMMAND_ID}" >> "$GITHUB_OUTPUT"
+          echo "::notice::SSM Command ID: ${COMMAND_ID}"
+
+      - name: Wait for deploy to complete
+        run: |
+          echo "Waiting for SSM command ${{ steps.deploy.outputs.command_id }} to finish..."
+          aws ssm wait command-executed \
+            --command-id "${{ steps.deploy.outputs.command_id }}" \
+            --instance-id "${{ env.ESB_DEPLOY_INSTANCE_ID }}" || true
+
+          STATUS=$(aws ssm get-command-invocation \
+            --command-id "${{ steps.deploy.outputs.command_id }}" \
+            --instance-id "${{ env.ESB_DEPLOY_INSTANCE_ID }}" \
+            --query "Status" --output text)
+
+          echo "Command status: ${STATUS}"
+          if [ "$STATUS" != "Success" ]; then
+            echo "::error::SSM command failed with status: ${STATUS}"
+            aws ssm get-command-invocation \
+              --command-id "${{ steps.deploy.outputs.command_id }}" \
+              --instance-id "${{ env.ESB_DEPLOY_INSTANCE_ID }}" \
+              --query "StandardErrorContent" --output text
+            exit 1
+          fi
+
+          aws ssm get-command-invocation \
+            --command-id "${{ steps.deploy.outputs.command_id }}" \
+            --instance-id "${{ env.ESB_DEPLOY_INSTANCE_ID }}" \
+            --query "StandardOutputContent" --output text
+
+          echo "✅ Deployment successful"
