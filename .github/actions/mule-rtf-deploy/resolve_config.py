@@ -94,10 +94,12 @@ def apply_overrides(props):
 
 
 def build_mvn_command(props, pom_file_path):
-    """Build the mvn deploy command from the final properties dict."""
+    """Build the mvn deploy command from the final properties dict.
+        Using package instead of deploy as a dry-run. No need to do actual deployment
+    """
     args = [
-        f"mvn deploy -f {pom_file_path}/pom.xml",
-        "-DmuleDeploy",
+        f"mvn package -f {pom_file_path}/pom.xml"
+        # "-DmuleDeploy",
     ]
 
     # All properties from the file (with overrides applied) become -D flags
