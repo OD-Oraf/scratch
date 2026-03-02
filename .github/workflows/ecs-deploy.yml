@@ -10,6 +10,7 @@ env:
   ECR_REPOSITORY: rest-service
   ECS_CLUSTER: rest-service-dev-cluster
   ECS_SERVICE: rest-service-dev-service
+  ECS_TASK_DEFINITION: rest-service-dev-task
   CONTAINER_NAME: rest-service
 
 permissions:
@@ -50,7 +51,7 @@ jobs:
       - name: Download current task definition
         run: |
           aws ecs describe-task-definition \
-            --task-definition ${{ env.ECS_SERVICE }}-task \
+            --task-definition ${{ env.ECS_TASK_DEFINITION }} \
             --query taskDefinition \
             > task-definition.json
 
