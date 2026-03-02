@@ -1,1 +1,6 @@
-*terraform*
+.terrafiorm*
+.terraform
+terraform.tfstate
+.terraform.lock.hcl
+session-manager-plugin.pkg
+terraform.tfstate.backup
