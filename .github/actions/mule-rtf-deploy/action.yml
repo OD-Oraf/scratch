@@ -202,4 +202,7 @@ runs:
         MULE_KEY: ${{ inputs.mule_key }}
         MVN_COMMAND: ${{ steps.config.outputs.mvn_command }}
       run: |
+        echo "::add-mask::${CONNECTED_APP_CLIENT_ID}"
+        echo "::add-mask::${CONNECTED_APP_CLIENT_SECRET}"
+        if [ -n "$MULE_KEY" ]; then echo "::add-mask::${MULE_KEY}"; fi
         eval "$MVN_COMMAND"

@@ -11,7 +11,6 @@ GITHUB_OUTPUT — the executing step provides them via env vars at runtime.
 
 import os
 import pathlib
-import re
 import sys
 
 
@@ -54,7 +53,7 @@ OVERRIDES = {
     "JAVA_VERSION":              "javaVersion",
 }
 
-# Secret keys — referenced as $SHELL_VARS in the command, redacted in logs
+# Secret keys — referenced as $SHELL_VARS in the command, masked via GitHub workflow masking
 SECRET_ARGS = [
     ("connected.app.clientId",     "CONNECTED_APP_CLIENT_ID"),
     ("connected.app.clientSecret", "CONNECTED_APP_CLIENT_SECRET"),
@@ -117,19 +116,15 @@ def build_mvn_command(props, pom_file_path):
     return " ".join(args)
 
 
-def redact_command(cmd):
-    """Replace secret shell variable references with ***."""
-    redacted = cmd
-    for prop_key, _ in SECRET_ARGS + OPTIONAL_SECRET_ARGS:
-        redacted = re.sub(
-            rf"-D{re.escape(prop_key)}=[^ ]+",
-            f"-D{prop_key}=***",
-            redacted,
-        )
-    return redacted
+def mask_secrets():
+    """Register secret values with GitHub's workflow masking via ::add-mask::."""
+    for _, env_var in SECRET_ARGS + OPTIONAL_SECRET_ARGS:
+        val = os.environ.get(env_var, "").strip()
+        if val:
+            print(f"::add-mask::{val}")
 
 
-def print_summary(props, redacted_cmd):
+def print_summary(props, mvn_command):
     """Print a human-readable deploy summary."""
     print("")
     print("═══════════════════════════════════════════════════════")
@@ -142,8 +137,8 @@ def print_summary(props, redacted_cmd):
     print(f"  CPU:         {props.get('rtf.cpuReserved', 'N/A')} / {props.get('rtf.cpuMax', 'N/A')}")
     print(f"  Memory:      {props.get('rtf.memoryReserved', 'N/A')} / {props.get('rtf.memoryMax', 'N/A')}")
     print("")
-    print("Maven command (redacted):")
-    print(f"  {redacted_cmd}")
+    print("Maven command:")
+    print(f"  {mvn_command}")
     print("")
 
 
@@ -169,19 +164,20 @@ def main():
     print("\n📝 Applying caller overrides:")
     apply_overrides(props)
 
+    # Mask secret values in GitHub Actions logs
+    mask_secrets()
+
     # Create maven arguments from properties file and overrides
     mvn_command = build_mvn_command(props, pom_file_path)
-    mvn_command_redacted = redact_command(mvn_command)
 
     # Print summary
-    print_summary(props, mvn_command_redacted)
+    print_summary(props, mvn_command)
 
     # Write to GitHub output variable to be used by subsequent steps
     output_file = os.environ.get("GITHUB_OUTPUT")
     if output_file:
         with open(output_file, "a") as out:
             out.write(f"mvn_command={mvn_command}\n")
-            out.write(f"mvn_command_redacted={mvn_command_redacted}\n")
     else:
         print("⚠️  GITHUB_OUTPUT not set — printing to stdout only", file=sys.stderr)
         print(f"\nmvn_command={mvn_command}")
