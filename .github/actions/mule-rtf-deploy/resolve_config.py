@@ -51,6 +51,13 @@ OVERRIDES = {
     "AUTOSCALING_ENABLED":       "autoscaling.enabled",
     "AUTOSCALING_MIN_REPLICAS":  "autoscaling.minReplicas",
     "AUTOSCALING_MAX_REPLICAS":  "autoscaling.maxReplicas",
+    # New Relic logging
+    "AWS_SECRET_ENV":            "aws.secret.env",
+    "NR_LOGS_PARTITION":         "nr_logs_partition",
+    "NR_DATA_PARTITION":         "nr_data_partition",
+    "NR_DATA_ENCODING":          "nr_data_encoding",
+    "NR_URL":                    "nr_url",
+    "LOG_LEVEL":                 "logLevel",
 }
 
 # Secret keys — shell var references, masked via GitHub workflow masking

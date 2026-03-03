@@ -163,6 +163,32 @@ inputs:
     required: false
     default: ''
 
+  # ── New Relic logging overrides ───────────────────────────────────
+  aws_secret_env:
+    description: 'aws.secret.env — AWS region for secrets (e.g. us-east-1)'
+    required: false
+    default: ''
+  nr_logs_partition:
+    description: 'nr_logs_partition — New Relic logs partition'
+    required: false
+    default: ''
+  nr_data_partition:
+    description: 'nr_data_partition — New Relic data partition'
+    required: false
+    default: ''
+  nr_data_encoding:
+    description: 'nr_data_encoding — New Relic data encoding (True/False)'
+    required: false
+    default: ''
+  nr_url:
+    description: 'nr_url — New Relic Log API endpoint'
+    required: false
+    default: ''
+  log_level:
+    description: 'logLevel — application log level (e.g. DEBUG, INFO, WARN, ERROR)'
+    required: false
+    default: ''
+
 runs:
   using: 'composite'
   steps:
@@ -207,6 +233,13 @@ runs:
         AUTOSCALING_ENABLED: ${{ inputs.autoscaling_enabled }}
         AUTOSCALING_MIN_REPLICAS: ${{ inputs.autoscaling_min_replicas }}
         AUTOSCALING_MAX_REPLICAS: ${{ inputs.autoscaling_max_replicas }}
+        # New Relic logging overrides
+        AWS_SECRET_ENV: ${{ inputs.aws_secret_env }}
+        NR_LOGS_PARTITION: ${{ inputs.nr_logs_partition }}
+        NR_DATA_PARTITION: ${{ inputs.nr_data_partition }}
+        NR_DATA_ENCODING: ${{ inputs.nr_data_encoding }}
+        NR_URL: ${{ inputs.nr_url }}
+        LOG_LEVEL: ${{ inputs.log_level }}
         MULE_KEY: ${{ inputs.mule_key }}
       run: python3 "$GITHUB_ACTION_PATH/resolve_config.py"
 
