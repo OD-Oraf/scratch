@@ -18,134 +18,148 @@ inputs:
 
   # ── Secrets (always from caller) ────────────────────────────────
   connected_app_client_id:
-    description: '-Dconnected.app.clientId'
+    description: 'connectedAppClientId — Connected App client ID'
     required: true
   connected_app_client_secret:
-    description: '-Dconnected.app.clientSecret'
+    description: 'connectedAppClientSecret — Connected App secret key'
     required: true
   mule_key:
-    description: '-Dmule.key  (Mule encryption key — optional)'
+    description: 'mule.key — Mule encryption key (optional)'
     required: false
     default: ''
 
-  # ── Caller overrides (org/env-specific) ─────────────────────────
+  # ── Top-level runtimeFabricDeployment parameter overrides ───────
+  # Ref: https://docs.mulesoft.com/mule-runtime/latest/deploy-to-rtf
   # Any non-empty value overrides the matching key from the properties file.
   anypoint_uri:
-    description: 'Override anypoint.uri'
+    description: 'uri — Anypoint Platform URI (default: https://anypoint.mulesoft.com)'
     required: false
     default: ''
   anypoint_environment:
-    description: 'Override anypoint.environment'
+    description: 'environment — target Anypoint Platform environment'
     required: false
     default: ''
   anypoint_business_group_id:
-    description: 'Override anypoint.businessGroupId'
+    description: 'businessGroupId — business group ID of the deployment'
+    required: false
+    default: ''
+  anypoint_business_group:
+    description: 'businessGroup — business group path (alternative to businessGroupId)'
     required: false
     default: ''
   connected_app_grant_type:
-    description: 'Override connected.app.grantType'
+    description: 'connectedAppGrantType — only supported value: client_credentials'
     required: false
     default: ''
   rtf_target:
-    description: 'Override rtf.target'
+    description: 'target — Runtime Fabric target name'
     required: false
     default: ''
   rtf_provider:
-    description: 'Override rtf.provider'
+    description: 'provider — set to MC for Runtime Fabric'
     required: false
     default: ''
   rtf_application_name:
-    description: 'Override rtf.applicationName'
+    description: 'applicationName — app name displayed in Runtime Manager'
     required: false
     default: ''
   rtf_replicas:
-    description: 'Override rtf.replicas'
-    required: false
-    default: ''
-  rtf_cpu_reserved:
-    description: 'Override rtf.cpuReserved'
-    required: false
-    default: ''
-  rtf_cpu_max:
-    description: 'Override rtf.cpuMax'
-    required: false
-    default: ''
-  rtf_memory_reserved:
-    description: 'Override rtf.memoryReserved'
-    required: false
-    default: ''
-  rtf_memory_max:
-    description: 'Override rtf.memoryMax'
+    description: 'replicas — number of replicas (1–16, only when autoscaling is false)'
     required: false
     default: ''
   mule_env:
-    description: 'Override mule.env'
+    description: 'mule.env — Mule environment property'
     required: false
     default: ''
   skip_tests:
-    description: 'Override skipTests'
-    required: false
-    default: ''
-
-  # ── deploymentSettings overrides (from RTF deploy reference) ───
-  enforce_deploying_replicas_across_nodes:
-    description: 'Override rtf.enforceDeployingReplicasAcrossNodes (true/false)'
-    required: false
-    default: ''
-  update_strategy:
-    description: 'Override updateStrategy (rolling/recreate)'
-    required: false
-    default: ''
-  clustered:
-    description: 'Override clustered (true/false)'
-    required: false
-    default: ''
-  http_inbound_public_url:
-    description: 'Override http.inbound.publicUrl'
-    required: false
-    default: ''
-  persistent_object_store:
-    description: 'Override persistentObjectStore (true/false)'
-    required: false
-    default: ''
-  jvm_args:
-    description: 'Override rtf.jvm.args (space-separated JVM arguments)'
-    required: false
-    default: ''
-  generate_default_public_url:
-    description: 'Override generateDefaultPublicUrl (true/false)'
-    required: false
-    default: ''
-  disable_am_log_forwarding:
-    description: 'Override disableAmLogForwarding (true/false)'
-    required: false
-    default: ''
-  autoscaling_enabled:
-    description: 'Override autoscaling.enabled (true/false)'
-    required: false
-    default: ''
-  autoscaling_min_replicas:
-    description: 'Override autoscaling.minReplicas'
-    required: false
-    default: ''
-  autoscaling_max_replicas:
-    description: 'Override autoscaling.maxReplicas'
-    required: false
-    default: ''
-  deployment_timeout:
-    description: 'Override deploymentTimeout (milliseconds)'
+    description: 'skipTests — skip Maven test execution (true/false)'
     required: false
     default: ''
   mule_version:
-    description: 'Override muleVersion (e.g. 4.6.0 or 4.6.0:1e-java17)'
+    description: 'muleVersion — Mule runtime version (e.g. 4.6.0 or 4.6.0:1e-java17)'
     required: false
     default: ''
   release_channel:
-    description: 'Override releaseChannel (NONE/EDGE/LTS)'
+    description: 'releaseChannel — NONE, EDGE, or LTS (default: EDGE)'
     required: false
     default: ''
   java_version:
-    description: 'Override javaVersion (8/17)'
+    description: 'javaVersion — 8 or 17 (default: 8)'
+    required: false
+    default: ''
+  deployment_timeout:
+    description: 'deploymentTimeout — elapsed time in milliseconds (default: 600000)'
+    required: false
+    default: ''
+  skip_deployment:
+    description: 'skip — skip the plugin deployment goal (true/false, default: false)'
+    required: false
+    default: ''
+  skip_deployment_verification:
+    description: 'skipDeploymentVerification — skip status verification (true/false, default: false)'
+    required: false
+    default: ''
+
+  # ── deploymentSettings parameter overrides ──────────────────────
+  # Ref: https://docs.mulesoft.com/mule-runtime/latest/deploy-to-rtf#deploymentsettings-parameters-reference
+  enforce_deploying_replicas_across_nodes:
+    description: 'enforceDeployingReplicasAcrossNodes (true/false, default: false)'
+    required: false
+    default: ''
+  update_strategy:
+    description: 'updateStrategy — rolling or recreate (default: rolling)'
+    required: false
+    default: ''
+  clustered:
+    description: 'clustered — enable clustering across replicas (true/false, default: false)'
+    required: false
+    default: ''
+  rtf_cpu_reserved:
+    description: 'resources > cpu > reserved — cores per replica (e.g. 500m, default: 0.5 vCores)'
+    required: false
+    default: ''
+  rtf_cpu_max:
+    description: 'resources > cpu > limit — max cores per replica'
+    required: false
+    default: ''
+  rtf_memory_reserved:
+    description: 'resources > memory > reserved — memory per replica (e.g. 700Mi)'
+    required: false
+    default: ''
+  rtf_memory_max:
+    description: 'resources > memory > limit — max memory per replica'
+    required: false
+    default: ''
+  http_inbound_public_url:
+    description: 'http > inbound > publicUrl — URL of the deployed application'
+    required: false
+    default: ''
+  persistent_object_store:
+    description: 'persistentObjectStore — use persistent object store (true/false, default: false)'
+    required: false
+    default: ''
+  jvm_args:
+    description: 'jvm > args — JVM arguments, space-separated (e.g. -XX:MaxRAMPercentage=60.0)'
+    required: false
+    default: ''
+  generate_default_public_url:
+    description: 'generateDefaultPublicUrl — not applicable for RTF BYOK (true/false, default: false)'
+    required: false
+    default: ''
+  disable_am_log_forwarding:
+    description: 'disableAmLogForwarding — disable app-level log forwarding (true/false, default: false)'
+    required: false
+    default: ''
+  autoscaling_enabled:
+    description: 'autoscaling > enabled — enable CPU-based horizontal autoscaling (true/false)'
+    required: false
+    default: ''
+  autoscaling_min_replicas:
+    description: 'autoscaling > minReplicas'
+    required: false
+    default: ''
+  autoscaling_max_replicas:
+    description: 'autoscaling > maxReplicas'
     required: false
     default: ''
 
@@ -159,25 +173,32 @@ runs:
       env:
         DEPLOY_PROPERTIES_FILE: ${{ inputs.deploy_properties_file }}
         POM_FILE_PATH: ${{ inputs.pom_file_path }}
-        # Caller overrides (non-empty values override the properties file)
+        # Top-level runtimeFabricDeployment overrides
         ANYPOINT_URI: ${{ inputs.anypoint_uri }}
         ANYPOINT_ENVIRONMENT: ${{ inputs.anypoint_environment }}
         ANYPOINT_BUSINESS_GROUP_ID: ${{ inputs.anypoint_business_group_id }}
+        ANYPOINT_BUSINESS_GROUP: ${{ inputs.anypoint_business_group }}
         CONNECTED_APP_GRANT_TYPE: ${{ inputs.connected_app_grant_type }}
         RTF_TARGET: ${{ inputs.rtf_target }}
         RTF_PROVIDER: ${{ inputs.rtf_provider }}
         RTF_APPLICATION_NAME: ${{ inputs.rtf_application_name }}
         RTF_REPLICAS: ${{ inputs.rtf_replicas }}
-        RTF_CPU_RESERVED: ${{ inputs.rtf_cpu_reserved }}
-        RTF_CPU_MAX: ${{ inputs.rtf_cpu_max }}
-        RTF_MEMORY_RESERVED: ${{ inputs.rtf_memory_reserved }}
-        RTF_MEMORY_MAX: ${{ inputs.rtf_memory_max }}
         MULE_ENV: ${{ inputs.mule_env }}
         SKIP_TESTS: ${{ inputs.skip_tests }}
+        MULE_VERSION: ${{ inputs.mule_version }}
+        RELEASE_CHANNEL: ${{ inputs.release_channel }}
+        JAVA_VERSION: ${{ inputs.java_version }}
+        DEPLOYMENT_TIMEOUT: ${{ inputs.deployment_timeout }}
+        SKIP_DEPLOYMENT: ${{ inputs.skip_deployment }}
+        SKIP_DEPLOYMENT_VERIFICATION: ${{ inputs.skip_deployment_verification }}
         # deploymentSettings overrides
         ENFORCE_DEPLOYING_REPLICAS_ACROSS_NODES: ${{ inputs.enforce_deploying_replicas_across_nodes }}
         UPDATE_STRATEGY: ${{ inputs.update_strategy }}
         CLUSTERED: ${{ inputs.clustered }}
+        RTF_CPU_RESERVED: ${{ inputs.rtf_cpu_reserved }}
+        RTF_CPU_MAX: ${{ inputs.rtf_cpu_max }}
+        RTF_MEMORY_RESERVED: ${{ inputs.rtf_memory_reserved }}
+        RTF_MEMORY_MAX: ${{ inputs.rtf_memory_max }}
         HTTP_INBOUND_PUBLIC_URL: ${{ inputs.http_inbound_public_url }}
         PERSISTENT_OBJECT_STORE: ${{ inputs.persistent_object_store }}
         JVM_ARGS: ${{ inputs.jvm_args }}
@@ -186,10 +207,6 @@ runs:
         AUTOSCALING_ENABLED: ${{ inputs.autoscaling_enabled }}
         AUTOSCALING_MIN_REPLICAS: ${{ inputs.autoscaling_min_replicas }}
         AUTOSCALING_MAX_REPLICAS: ${{ inputs.autoscaling_max_replicas }}
-        DEPLOYMENT_TIMEOUT: ${{ inputs.deployment_timeout }}
-        MULE_VERSION: ${{ inputs.mule_version }}
-        RELEASE_CHANNEL: ${{ inputs.release_channel }}
-        JAVA_VERSION: ${{ inputs.java_version }}
         MULE_KEY: ${{ inputs.mule_key }}
       run: python3 "$GITHUB_ACTION_PATH/resolve_config.py"
 

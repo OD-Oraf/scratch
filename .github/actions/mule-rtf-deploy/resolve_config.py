@@ -15,28 +15,34 @@ import sys
 
 
 # ── Caller overrides: env var → properties-file key ──────────────────────
+# Ref: https://docs.mulesoft.com/mule-runtime/latest/deploy-to-rtf
 OVERRIDES = {
-    # Anypoint Platform
+    # Top-level runtimeFabricDeployment parameters
     "ANYPOINT_URI":              "anypoint.uri",
     "ANYPOINT_ENVIRONMENT":      "anypoint.environment",
     "ANYPOINT_BUSINESS_GROUP_ID":"anypoint.businessGroupId",
+    "ANYPOINT_BUSINESS_GROUP":   "anypoint.businessGroup",
     "CONNECTED_APP_GRANT_TYPE":  "connected.app.grantType",
-    # RTF top-level
     "RTF_TARGET":                "rtf.target",
     "RTF_PROVIDER":              "rtf.provider",
     "RTF_APPLICATION_NAME":      "rtf.applicationName",
     "RTF_REPLICAS":              "rtf.replicas",
+    "MULE_ENV":                  "mule.env",
+    "SKIP_TESTS":                "skipTests",
+    "MULE_VERSION":              "muleVersion",
+    "RELEASE_CHANNEL":           "releaseChannel",
+    "JAVA_VERSION":              "javaVersion",
+    "DEPLOYMENT_TIMEOUT":        "deploymentTimeout",
+    "SKIP_DEPLOYMENT":           "skip",
+    "SKIP_DEPLOYMENT_VERIFICATION": "skipDeploymentVerification",
+    # deploymentSettings parameters
+    "ENFORCE_DEPLOYING_REPLICAS_ACROSS_NODES": "rtf.enforceDeployingReplicasAcrossNodes",
+    "UPDATE_STRATEGY":           "updateStrategy",
+    "CLUSTERED":                 "clustered",
     "RTF_CPU_RESERVED":          "rtf.cpuReserved",
     "RTF_CPU_MAX":               "rtf.cpuMax",
     "RTF_MEMORY_RESERVED":       "rtf.memoryReserved",
     "RTF_MEMORY_MAX":            "rtf.memoryMax",
-    # Mule runtime
-    "MULE_ENV":                  "mule.env",
-    "SKIP_TESTS":                "skipTests",
-    # deploymentSettings
-    "ENFORCE_DEPLOYING_REPLICAS_ACROSS_NODES": "rtf.enforceDeployingReplicasAcrossNodes",
-    "UPDATE_STRATEGY":           "updateStrategy",
-    "CLUSTERED":                 "clustered",
     "HTTP_INBOUND_PUBLIC_URL":   "http.inbound.publicUrl",
     "PERSISTENT_OBJECT_STORE":   "persistentObjectStore",
     "JVM_ARGS":                  "rtf.jvm.args",
@@ -45,10 +51,6 @@ OVERRIDES = {
     "AUTOSCALING_ENABLED":       "autoscaling.enabled",
     "AUTOSCALING_MIN_REPLICAS":  "autoscaling.minReplicas",
     "AUTOSCALING_MAX_REPLICAS":  "autoscaling.maxReplicas",
-    "DEPLOYMENT_TIMEOUT":        "deploymentTimeout",
-    "MULE_VERSION":              "muleVersion",
-    "RELEASE_CHANNEL":           "releaseChannel",
-    "JAVA_VERSION":              "javaVersion",
 }
 
 # Secret keys — shell var references, masked via GitHub workflow masking
