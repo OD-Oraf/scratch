@@ -129,7 +129,7 @@ def print_config_summary(props_file, file_props, overridden_keys, final_props, m
     print(f"  {'PROPERTY':<45} {'SOURCE'}")
     print(f"{'─' * 60}")
     for key in sorted(final_props):
-        source = "← override" if key in overridden_keys else "  file"
+        source = "← action input" if key in overridden_keys else "  properties file"
         print(f"  {key:<45} {source}")
         print(f"    = {final_props[key]}")
 
