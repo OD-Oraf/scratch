@@ -118,7 +118,7 @@ inputs:
     description: 'resources > cpu > reserved — cores per replica (e.g. 500m, default: 0.5 vCores)'
     required: false
     default: ''
-  rtf_cpu_max:
+  rtf_cpu_limit:
     description: 'resources > cpu > limit — max cores per replica'
     required: false
     default: ''
@@ -126,7 +126,7 @@ inputs:
     description: 'resources > memory > reserved — memory per replica (e.g. 700Mi)'
     required: false
     default: ''
-  rtf_memory_max:
+  rtf_memory_limit:
     description: 'resources > memory > limit — max memory per replica'
     required: false
     default: ''
@@ -196,9 +196,9 @@ runs:
         UPDATE_STRATEGY: ${{ inputs.update_strategy }}
         CLUSTERED: ${{ inputs.clustered }}
         RTF_CPU_RESERVED: ${{ inputs.rtf_cpu_reserved }}
-        RTF_CPU_MAX: ${{ inputs.rtf_cpu_max }}
+        RTF_CPU_LIMIT: ${{ inputs.rtf_cpu_limit }}
         RTF_MEMORY_RESERVED: ${{ inputs.rtf_memory_reserved }}
-        RTF_MEMORY_MAX: ${{ inputs.rtf_memory_max }}
+        RTF_MEMORY_LIMIT: ${{ inputs.rtf_memory_limit }}
         HTTP_INBOUND_PUBLIC_URL: ${{ inputs.http_inbound_public_url }}
         PERSISTENT_OBJECT_STORE: ${{ inputs.persistent_object_store }}
         JVM_ARGS: ${{ inputs.jvm_args }}
