@@ -54,6 +54,8 @@ on:
 
 env:
   anypoint_uri: 'https://anypoint.mulesoft.com'
+  CONNECTED_APP_CLIENT_ID: username
+  CONNECTED_APP_CLIENT_SECRET: password
 # ─────────────────────────────────────────────────────────────────
 # Three-tier override hierarchy (each tier wins over the one below):
 #   1. Dispatch inputs       — per-run overrides (e.g. load testing)
@@ -127,8 +129,8 @@ jobs:
           deploy_properties_file: ${{ inputs.pom_file_path }}/deploy-properties/${{ inputs.environment }}.properties
           pom_file_path: ${{ inputs.pom_file_path }}
           # Secrets
-          connected_app_client_id: ${{ secrets.CONNECTED_APP_CLIENT_ID }}
-          connected_app_client_secret: ${{ secrets.CONNECTED_APP_CLIENT_SECRET }}
+          connected_app_client_id: ${{ env.CONNECTED_APP_CLIENT_ID }}
+          connected_app_client_secret: ${{ env.CONNECTED_APP_CLIENT_SECRET }}
           mule_key: ${{ secrets.MULE_KEY }}
           # ── Org/env overrides ────────────────────────────────────────
           anypoint_uri: ${{ inputs.anypoint_uri }}
