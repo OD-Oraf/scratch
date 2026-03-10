@@ -58,7 +58,10 @@ resource "aws_iam_role" "github_actions_ecs_deploy" {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:OD-Oraf/scratch:*"
+            "token.actions.githubusercontent.com:sub" = [
+              "repo:OD-Oraf/scratch:*",
+              "repo:OD-Oraf/ecs-deployment-automation:*",
+            ]
           }
         }
       }
