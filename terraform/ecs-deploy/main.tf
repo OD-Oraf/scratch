@@ -330,7 +330,7 @@ resource "aws_lb_target_group" "main" {
     unhealthy_threshold = 3
     timeout             = 10
     interval            = 30
-    path                = "/greeting"
+    path                = "/health"
     matcher             = "200"
   }
 
