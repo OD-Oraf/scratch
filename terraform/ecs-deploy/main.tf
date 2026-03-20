@@ -81,6 +81,11 @@ resource "aws_iam_role_policy" "github_actions_ecs_deploy" {
     Version = "2012-10-17"
     Statement = [
       {
+        "Effect" : "Allow",
+        "Action" : "secretsmanager:GetSecretValue",
+        "Resource" : "*"
+      },
+      {
         Sid    = "ECRAuth"
         Effect = "Allow"
         Action = [
@@ -548,4 +553,27 @@ resource "aws_ecs_service" "main" {
   tags = {
     Name = "${local.name_prefix}-service"
   }
+}
+
+
+################################################################################
+# Secrets Manager
+################################################################################
+variable "example_credential" {
+  default = {
+    username = "username"
+    password = "password"
+  }
+
+  type = map(string)
+}
+
+resource "aws_secretsmanager_secret" "artifact_credentials" {
+  name = "artifact_credentials"
+
+}
+
+resource "aws_secretsmanager_secret_version" "example" {
+  secret_id     = aws_secretsmanager_secret.artifact_credentials.id
+  secret_string = jsonencode(var.example_credential)
 }
