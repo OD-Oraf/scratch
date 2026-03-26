@@ -24,8 +24,8 @@ fi
 if gh api \
   -H "${API_ACCEPT}" \
   -H "${API_VERSION}" \
-  "/orgs/${ORG}/repos?per_page=${PER_PAGE}&page=${PAGE}&sort=full_name&direction=asc" \
-  | jq "${JQ_FILTER}"; then
+  --jq "${JQ_FILTER}" \
+  "/orgs/${ORG}/repos?per_page=${PER_PAGE}&page=${PAGE}&sort=full_name&direction=asc"; then
     log_success "Retrieved repositories for ${ORG} (page ${PAGE})"
 else
     log_error "Failed to list repositories for ${ORG}"
