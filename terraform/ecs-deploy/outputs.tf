@@ -23,6 +23,16 @@ output "ecs_service_name" {
   value       = aws_ecs_service.main.name
 }
 
+output "frontend_ecr_repository_url" {
+  description = "URL of the frontend ECR repository"
+  value       = aws_ecr_repository.frontend.repository_url
+}
+
+output "frontend_ecs_service_name" {
+  description = "Name of the frontend ECS service"
+  value       = aws_ecs_service.frontend.name
+}
+
 output "github_actions_role_arn" {
   description = "ARN of the IAM role for GitHub Actions (use as AWS_ROLE_ARN secret)"
   value       = aws_iam_role.github_actions_ecs_deploy.arn

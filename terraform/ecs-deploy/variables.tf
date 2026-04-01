@@ -46,6 +46,18 @@ variable "ecr_repository_name" {
   default     = "rest-service"
 }
 
+variable "frontend_ecr_repository_name" {
+  description = "Name of the frontend ECR repository"
+  type        = string
+  default     = "frontend-app"
+}
+
+variable "frontend_container_port" {
+  description = "Port the frontend container listens on"
+  type        = number
+  default     = 3000
+}
+
 variable "vpc_cidr" {
   description = "CIDR block for the VPC"
   type        = string

@@ -105,7 +105,10 @@ resource "aws_iam_role_policy" "github_actions_ecs_deploy" {
           "ecr:UploadLayerPart",
           "ecr:CompleteLayerUpload"
         ]
-        Resource = aws_ecr_repository.main.arn
+        Resource = [
+          aws_ecr_repository.main.arn,
+          aws_ecr_repository.frontend.arn
+        ]
       },
       {
         Sid    = "ECSTaskDefinition"
@@ -123,7 +126,10 @@ resource "aws_iam_role_policy" "github_actions_ecs_deploy" {
           "ecs:UpdateService",
           "ecs:DescribeServices"
         ]
-        Resource = "arn:aws:ecs:${var.aws_region}:*:service/${aws_ecs_cluster.main.name}/${aws_ecs_service.main.name}"
+        Resource = [
+          "arn:aws:ecs:${var.aws_region}:*:service/${aws_ecs_cluster.main.name}/${aws_ecs_service.main.name}",
+          "arn:aws:ecs:${var.aws_region}:*:service/${aws_ecs_cluster.main.name}/${aws_ecs_service.frontend.name}"
+        ]
       },
       {
         Sid    = "PassRole"
@@ -294,6 +300,14 @@ resource "aws_security_group" "ecs" {
     security_groups = [aws_security_group.alb.id]
   }
 
+  ingress {
+    description     = "Allow traffic from ALB for frontend"
+    from_port       = var.frontend_container_port
+    to_port         = var.frontend_container_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -344,6 +358,28 @@ resource "aws_lb_target_group" "main" {
   }
 }
 
+resource "aws_lb_target_group" "frontend" {
+  name        = "${local.name_prefix}-frontend-tg"
+  port        = var.frontend_container_port
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.main.id
+  target_type = "ip"
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 3
+    unhealthy_threshold = 3
+    timeout             = 10
+    interval            = 30
+    path                = "/"
+    matcher             = "200"
+  }
+
+  tags = {
+    Name = "${local.name_prefix}-frontend-tg"
+  }
+}
+
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
   port              = 80
@@ -351,7 +387,23 @@ resource "aws_lb_listener" "http" {
 
   default_action {
     type             = "forward"
+    target_group_arn = aws_lb_target_group.frontend.arn
+  }
+}
+
+resource "aws_lb_listener_rule" "api" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 100
+
+  action {
+    type             = "forward"
     target_group_arn = aws_lb_target_group.main.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/api/*"]
+    }
   }
 }
 
@@ -375,6 +427,41 @@ resource "aws_ecr_repository" "main" {
 
 resource "aws_ecr_lifecycle_policy" "main" {
   repository = aws_ecr_repository.main.name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Keep last 10 images"
+        selection = {
+          tagStatus   = "any"
+          countType   = "imageCountMoreThan"
+          countNumber = 10
+        }
+        action = {
+          type = "expire"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_ecr_repository" "frontend" {
+  name                 = var.frontend_ecr_repository_name
+  image_tag_mutability = "MUTABLE"
+  force_delete         = true
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = {
+    Name = "${local.name_prefix}-frontend-ecr"
+  }
+}
+
+resource "aws_ecr_lifecycle_policy" "frontend" {
+  repository = aws_ecr_repository.frontend.name
 
   policy = jsonencode({
     rules = [
@@ -552,6 +639,99 @@ resource "aws_ecs_service" "main" {
 
   tags = {
     Name = "${local.name_prefix}-service"
+  }
+}
+
+################################################################################
+# Frontend – CloudWatch Log Group
+################################################################################
+
+resource "aws_cloudwatch_log_group" "frontend" {
+  name              = "/ecs/${local.name_prefix}-frontend"
+  retention_in_days = 30
+
+  tags = {
+    Name = "${local.name_prefix}-frontend-log-group"
+  }
+}
+
+################################################################################
+# Frontend – ECS Task Definition
+################################################################################
+
+resource "aws_ecs_task_definition" "frontend" {
+  family                   = "${local.name_prefix}-frontend-task"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = var.task_cpu
+  memory                   = var.task_memory
+  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
+  task_role_arn            = aws_iam_role.ecs_task.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "${var.project_name}-frontend"
+      image     = "${aws_ecr_repository.frontend.repository_url}:latest"
+      essential = true
+
+      portMappings = [
+        {
+          containerPort = var.frontend_container_port
+          hostPort      = var.frontend_container_port
+          protocol      = "tcp"
+        }
+      ]
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.frontend.name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "ecs"
+        }
+      }
+
+      environment = [
+        {
+          name  = "PORT"
+          value = tostring(var.frontend_container_port)
+        }
+      ]
+    }
+  ])
+
+  tags = {
+    Name = "${local.name_prefix}-frontend-task"
+  }
+}
+
+################################################################################
+# Frontend – ECS Service
+################################################################################
+
+resource "aws_ecs_service" "frontend" {
+  name            = "${local.name_prefix}-frontend-service"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.frontend.arn
+  desired_count   = var.desired_count
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets          = aws_subnet.private[*].id
+    security_groups  = [aws_security_group.ecs.id]
+    assign_public_ip = false
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.frontend.arn
+    container_name   = "${var.project_name}-frontend"
+    container_port   = var.frontend_container_port
+  }
+
+  depends_on = [aws_lb_listener.http]
+
+  tags = {
+    Name = "${local.name_prefix}-frontend-service"
   }
 }
 
