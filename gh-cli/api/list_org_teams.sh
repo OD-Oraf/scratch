@@ -21,16 +21,17 @@ else
 fi
 log_api_call "GET" "/orgs/${ORG}/teams"
 
-if RESULT=$(gh api \
+JQ_FILTER="."
+if [[ -n "${FILTER}" ]]; then
+    JQ_FILTER="[.[] | select(.name | startswith(\"${FILTER}\"))]"
+fi
+
+if gh api \
     --paginate \
     -H "${API_ACCEPT}" \
     -H "${API_VERSION}" \
-    "orgs/${ORG}/teams"); then
-    if [[ -n "${FILTER}" ]]; then
-        echo "${RESULT}" | jq --arg f "${FILTER}" '[.[] | select(.name | startswith($f))]'
-    else
-        echo "${RESULT}"
-    fi
+    --jq "${JQ_FILTER}" \
+    "orgs/${ORG}/teams"; then
     log_success "Retrieved teams for ${ORG}"
 else
     log_error "Failed to list teams for ${ORG}"
