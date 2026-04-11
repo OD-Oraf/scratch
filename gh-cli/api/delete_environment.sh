@@ -19,13 +19,13 @@ fi
 
 log_info "Deleting environment ${ENV_NAME} for ${OWNER}/${REPO}"
 
-log_api_call "DELETE" "/repos/${OWNER}/${REPO}/environments/${ENV_NAME}"
+log_api_call "DELETE" "repos/${OWNER}/${REPO}/environments/${ENV_NAME}"
 
 if gh api \
     -X DELETE \
     -H "${API_ACCEPT}" \
     -H "${API_VERSION}" \
-    "/repos/${OWNER}/${REPO}/environments/${ENV_NAME}"; then
+    "repos/${OWNER}/${REPO}/environments/${ENV_NAME}"; then
     log_success "Environment '${ENV_NAME}' deleted for ${OWNER}/${REPO}"
 else
     log_error "Failed to delete environment '${ENV_NAME}' for ${OWNER}/${REPO}"
