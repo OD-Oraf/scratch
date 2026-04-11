@@ -24,7 +24,7 @@ REVIEWERS_JSON="[]"
 if [ -n "$REVIEWER_IDS" ]; then
     REVIEWERS_JSON=$(echo "$REVIEWER_IDS" | tr ',' '\n' | while read -r uid; do
         uid=$(echo "$uid" | xargs)
-        [ -n "$uid" ] && echo "{\"type\":\"User\",\"id\":${uid}}"
+        [ -n "$uid" ] && echo "{\"type\":\"Team\",\"id\":${uid}}"
     done | paste -sd ',' - | sed 's/^/[/;s/$/]/')
     log_info "Adding reviewers: ${REVIEWERS_JSON}"
 fi
@@ -45,7 +45,7 @@ if gh api \
     --method PUT \
     -H "${API_ACCEPT}" \
     -H "${API_VERSION}" \
-    "/repos/${OWNER}/${REPO}/environments/${ENV_NAME}" \
+    "repos/${OWNER}/${REPO}/environments/${ENV_NAME}" \
     --input - <<< "${BODY}"; then
     log_success "Environment '${ENV_NAME}' created for ${OWNER}/${REPO}"
 else
