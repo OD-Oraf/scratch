@@ -40,14 +40,14 @@ BODY=$(cat <<EOF
 EOF
 )
 
-log_api_call "PUT" "/repos/${OWNER}/${REPO}/environments/${ENV_NAME}"
+log_api_call "PUT" "repos/${OWNER}/${REPO}/environments/${ENV_NAME}"
 log_debug "Request body: $BODY"
 
 if echo "$BODY" | gh api \
     --method PUT \
     -H "${API_ACCEPT}" \
     -H "${API_VERSION}" \
-    "/repos/${OWNER}/${REPO}/environments/${ENV_NAME}" \
+    "repos/${OWNER}/${REPO}/environments/${ENV_NAME}" \
     --input -; then
     log_success "Environment settings updated for ${OWNER}/${REPO} env=${ENV_NAME}"
 else
