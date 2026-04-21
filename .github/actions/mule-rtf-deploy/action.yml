@@ -242,17 +242,3 @@ runs:
         LOG_LEVEL: ${{ inputs.log_level }}
         MULE_KEY: ${{ inputs.mule_key }}
       run: python3 "$GITHUB_ACTION_PATH/resolve_config.py"
-
-    # ── Step 2: Execute mvn deploy ───────────────────────────────
-    - name: Deploy to RTF via Maven
-      shell: bash
-      env:
-        CONNECTED_APP_CLIENT_ID: ${{ inputs.connected_app_client_id }}
-        CONNECTED_APP_CLIENT_SECRET: ${{ inputs.connected_app_client_secret }}
-        MULE_KEY: ${{ inputs.mule_key }}
-        MVN_COMMAND: ${{ steps.config.outputs.mvn_command }}
-      run: |
-        echo "::add-mask::${CONNECTED_APP_CLIENT_ID}"
-        echo "::add-mask::${CONNECTED_APP_CLIENT_SECRET}"
-        if [ -n "$MULE_KEY" ]; then echo "::add-mask::${MULE_KEY}"; fi
-        eval "$MVN_COMMAND"
