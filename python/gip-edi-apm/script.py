@@ -33,7 +33,6 @@ def get_file_path_base64_map(json_config):
     return file_path_base64_map
 
 
-
 def read_config_file():
     config_file_path = "config/dev/TestPartner-Config.json"
     with open(config_file_path, 'rb') as config_file:
