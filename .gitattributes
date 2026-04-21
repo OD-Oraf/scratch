@@ -1,2 +1,2 @@
 # Always keep this branch's workflow files during merges
-.github/workflows/** merge=ours
+.github/** merge=ours
