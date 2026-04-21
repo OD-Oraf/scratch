@@ -56,6 +56,23 @@ The `.github/act/.secrets` file holds test values for `CONNECTED_APP_CLIENT_ID`,
 
 `.github/workflows/esb-build.yml` and `esb-deploy.yml` are a separate pipeline for an EC2-based ESB. They use AWS SSM (`send-command`) to run shell commands on EC2 instances and S3 as an artifact transfer bucket. Infrastructure is managed via `terraform/main.tf`.
 
+## Workflow file protection (merge strategy)
+
+`.gitattributes` is configured so that `.github/workflows/**` always keeps this branch's version during a `git merge`. Changes to workflow files on incoming branches are silently dropped.
+
+```
+# .gitattributes
+.github/workflows/** merge=ours
+```
+
+The merge driver must be registered once per local clone before it takes effect:
+
+```bash
+git config merge.ours.driver true
+```
+
+**Scope:** applies to `git merge` only. Does not protect against `git rebase`, `git cherry-pick`, or explicit `git checkout -- <file>`.
+
 ## Properties file format
 
 ```properties
