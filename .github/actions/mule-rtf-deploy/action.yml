@@ -256,3 +256,4 @@ runs:
         echo "::add-mask::${CONNECTED_APP_CLIENT_SECRET}"
         if [ -n "$MULE_KEY" ]; then echo "::add-mask::${MULE_KEY}"; fi
         eval "$MVN_COMMAND"
+        echo "hello"
