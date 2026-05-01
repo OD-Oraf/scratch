@@ -1,0 +1,100 @@
+name: Setup environment settings
+
+run-name: "Setup environment settings (${{ inputs.environment }} → OD-Oraf/${{ inputs.repo }})"
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: "Target repository name (under OD-Oraf)"
+        type: string
+        required: true
+      environment:
+        description: "Environment name to create/update"
+        type: choice
+        required: true
+        default: dev
+        options:
+          - dev
+          - staging
+          - production
+      reviewer:
+        description: "Reviewer identifier — login (user), 'org/team-slug' (org team), or 'enterprise/team-slug' (enterprise team)"
+        type: string
+        required: false
+        default: "OD-Oraf"
+      reviewer_kind:
+        description: "How to resolve the reviewer"
+        type: choice
+        required: true
+        default: user
+        options:
+          - user
+          - org-team
+          - enterprise-team
+
+permissions:
+  contents: read
+
+jobs:
+  setup-environment:
+    name: Setup environment
+    runs-on: ubuntu-latest
+
+    env:
+      GH_TOKEN: ${{ secrets.GH_PAT }}
+      OWNER: OD-Oraf
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate token
+        run: |
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error::Secret GH_PAT is not set."
+            exit 1
+          fi
+          gh auth status
+
+      - name: Make scripts executable
+        run: chmod +x gh-cli/api/*.sh
+
+      - name: Resolve reviewer
+        id: reviewer
+        env:
+          REVIEWER: ${{ inputs.reviewer }}
+          REVIEWER_KIND: ${{ inputs.reviewer_kind }}
+        run: |
+          set -euo pipefail
+          case "$REVIEWER_KIND" in
+            user)
+              ID=$(gh api "/users/${REVIEWER}" --jq '.id')
+              TYPE="User"
+              ;;
+            org-team)
+              ORG="${REVIEWER%%/*}"
+              SLUG="${REVIEWER##*/}"
+              ID=$(gh api "/orgs/${ORG}/teams/${SLUG}" --jq '.id')
+              TYPE="Team"
+              ;;
+            enterprise-team)
+              ENT="${REVIEWER%%/*}"
+              SLUG="${REVIEWER##*/}"
+              ID=$(gh api "/enterprises/${ENT}/teams/${SLUG}" --jq '.id')
+              TYPE="Team"
+              ;;
+          esac
+          echo "Resolved ${REVIEWER} (${REVIEWER_KIND}) → ${TYPE} id=${ID}"
+          echo "type=${TYPE}" >> "$GITHUB_OUTPUT"
+          echo "id=${ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Update environment settings
+        run: |
+          ./gh-cli/api/update_environment_settings.sh \
+            "${{ inputs.repo }}" \
+            "${{ inputs.environment }}" \
+            "$OWNER" \
+            0 \
+            "${{ steps.reviewer.outputs.type }}" \
+            "${{ steps.reviewer.outputs.id }}"
