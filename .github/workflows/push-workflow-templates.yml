@@ -36,8 +36,8 @@ jobs:
       # PAT with `repo` + `workflow` scopes. GITHUB_TOKEN can't write
       # workflow files in other repos.
       GH_TOKEN: ${{ secrets.GH_PAT }}
-      PROD_TEMPLATE: .github/workflow-templates/prod-template.yml
-      NONPROD_TEMPLATE: .github/workflow-templates/non-prod-template.yml
+      PROD_TEMPLATE: .github/workflow-templates/prod-template.yaml
+      NONPROD_TEMPLATE: .github/workflow-templates/non-prod-template.yaml
       PROD_DEST: .github/workflows/prod.yml
       NONPROD_DEST: .github/workflows/non-prod.yml
       FULL_REPO: OD-Oraf/${{ inputs.repo }}
