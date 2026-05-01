@@ -1,0 +1,23 @@
+name: Template (prod)
+
+run-name: "Template (prod) — ${{ github.repository }}"
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  prod:
+    name: Prod pipeline
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Placeholder build step
+        run: echo "prod build for ${{ github.repository }}"

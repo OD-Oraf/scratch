@@ -1,0 +1,134 @@
+name: Push workflow templates
+
+run-name: "Push workflow templates (${{ inputs.template }} → ${{ inputs.target_repos || inputs.search || 'ALL repos' }})"
+
+on:
+  workflow_dispatch:
+    inputs:
+      template:
+        description: "Which template(s) to push"
+        type: choice
+        required: true
+        default: non-prod
+        options:
+          - prod
+          - non-prod
+          - both
+      target_repos:
+        description: "Comma-separated repo names (e.g. 'repo-a,repo-b'). Leave blank to target all repos for the owner."
+        type: string
+        required: false
+        default: ""
+      search:
+        description: "Optional GitHub search filter (only used when target_repos is blank)"
+        type: string
+        required: false
+        default: ""
+      owner:
+        description: "GitHub owner (defaults to params.sh ORG_NAME)"
+        type: string
+        required: false
+        default: ""
+      dry_run:
+        description: "Dry run — list targets without pushing"
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  push-templates:
+    name: Push templates
+    runs-on: ubuntu-latest
+
+    env:
+      # PAT with `repo` + `workflow` scopes. GITHUB_TOKEN can't write
+      # workflow files in other repos.
+      GH_TOKEN: ${{ secrets.GH_PAT }}
+      PROD_TEMPLATE: .github/workflow-templates/prod-template.yml
+      NONPROD_TEMPLATE: .github/workflow-templates/non-prod-template.yml
+      PROD_DEST: .github/workflows/prod.yml
+      NONPROD_DEST: .github/workflows/non-prod.yml
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate token
+        run: |
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error::Secret WORKFLOW_PUSH_TOKEN is not set. It must be a PAT with 'repo' and 'workflow' scopes."
+            exit 1
+          fi
+          gh auth status
+
+      - name: Make scripts executable
+        run: chmod +x gh-cli/api/*.sh
+
+      - name: Build target list
+        id: targets
+        run: |
+          set -euo pipefail
+          if [ -n "${{ inputs.target_repos }}" ]; then
+            echo "${{ inputs.target_repos }}" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$' > targets.txt
+          else
+            echo "" > targets.txt
+          fi
+          echo "count=$(wc -l < targets.txt | tr -d ' ')" >> "$GITHUB_OUTPUT"
+          echo "Target list:"
+          cat targets.txt || true
+
+      - name: Push template(s)
+        run: |
+          set -euo pipefail
+
+          TEMPLATES=()
+          case "${{ inputs.template }}" in
+            prod)     TEMPLATES=("$PROD_TEMPLATE:$PROD_DEST") ;;
+            non-prod) TEMPLATES=("$NONPROD_TEMPLATE:$NONPROD_DEST") ;;
+            both)     TEMPLATES=("$PROD_TEMPLATE:$PROD_DEST" "$NONPROD_TEMPLATE:$NONPROD_DEST") ;;
+          esac
+
+          DRY_FLAG=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            DRY_FLAG="--dry-run"
+          fi
+
+          OWNER_ARG=""
+          if [ -n "${{ inputs.owner }}" ]; then
+            OWNER_ARG="${{ inputs.owner }}"
+          fi
+
+          for entry in "${TEMPLATES[@]}"; do
+            LOCAL="${entry%%:*}"
+            DEST="${entry##*:}"
+            echo "::group::Pushing $LOCAL -> $DEST"
+
+            if [ -s targets.txt ]; then
+              # Specific repos
+              while IFS= read -r repo; do
+                [ -z "$repo" ] && continue
+                if [ -n "$OWNER_ARG" ] && [[ "$repo" != */* ]]; then
+                  repo="${OWNER_ARG}/${repo}"
+                fi
+                ./gh-cli/api/update_workflow_single_repo.sh "$LOCAL" "$repo" "$DEST" $DRY_FLAG
+              done < targets.txt
+            else
+              # All repos (optionally filtered by --search)
+              ARGS=("$LOCAL" "$DEST")
+              if [ -n "$OWNER_ARG" ]; then
+                ARGS+=("$OWNER_ARG")
+              fi
+              if [ -n "${{ inputs.search }}" ]; then
+                ARGS+=(--search "${{ inputs.search }}")
+              fi
+              if [ -n "$DRY_FLAG" ]; then
+                ARGS+=("$DRY_FLAG")
+              fi
+              ./gh-cli/api/update_workflow_across_repos.sh "${ARGS[@]}"
+            fi
+
+            echo "::endgroup::"
+          done
