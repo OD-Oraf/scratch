@@ -11,13 +11,9 @@ on:
         required: true
       environment:
         description: "Environment name to create/update"
-        type: choice
+        type: string
         required: true
         default: dev
-        options:
-          - dev
-          - staging
-          - production
       reviewer:
         description: "Reviewer identifier — login (user), 'org/team-slug' (org team), or 'enterprise/team-slug' (enterprise team)"
         type: string
@@ -25,9 +21,13 @@ on:
         default: "OD-Oraf"
       reviewer_kind:
         description: "How to resolve the reviewer"
-        type: string
+        type: choice
         required: true
         default: user
+        options:
+          - user
+          - org-team
+          - enterprise-team
 
 permissions:
   contents: read
