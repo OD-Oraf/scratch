@@ -25,13 +25,9 @@ on:
         default: "OD-Oraf"
       reviewer_kind:
         description: "How to resolve the reviewer"
-        type: choice
+        type: string
         required: true
         default: user
-        options:
-          - user
-          - org-team
-          - enterprise-team
 
 permissions:
   contents: read
