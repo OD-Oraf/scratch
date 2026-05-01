@@ -12,7 +12,7 @@ set -euo pipefail
 #
 # Examples:
 #   ./update_workflow_single_repo.sh ./ci.yml my-repo
-#   ./update_workflow_single_repo.sh ./ci.yml OD-ORAF/my-repo .github/workflows/ci.yml
+#   ./update_workflow_single_repo.sh ../../.github/workflow-templates/non-prod-template.yml OD-ORAF/scratch .github/workflows/np_template.yml
 #   ./update_workflow_single_repo.sh ./ci.yml my-repo .github/workflows/ci.yml --dry-run
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
