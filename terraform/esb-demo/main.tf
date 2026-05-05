@@ -6,6 +6,15 @@ terraform {
       version = "~> 5.0"
     }
   }
+
+  # Bootstrap: first apply with this block commented out so the state bucket
+  # gets created locally. Then uncomment and run `terraform init -migrate-state`.
+  backend "s3" {
+    bucket  = "esb-demo-tfstate-od-oraf"
+    key     = "esb-demo/terraform.tfstate"
+    region  = "us-east-1"
+    encrypt = true
+  }
 }
 
 provider "aws" {
@@ -142,9 +151,149 @@ resource "aws_iam_role_policy" "s3_transfer" {
   })
 }
 
+# ── S3 bucket for Terraform remote state ─────────────────────
+resource "aws_s3_bucket" "tfstate" {
+  bucket = "esb-demo-tfstate-od-oraf"
+
+  tags = {
+    Name        = "esb-demo-tfstate"
+    Environment = "dev"
+    Purpose     = "terraform-state"
+  }
+}
+
+resource "aws_s3_bucket_versioning" "tfstate" {
+  bucket = aws_s3_bucket.tfstate.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "tfstate" {
+  bucket = aws_s3_bucket.tfstate.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "tfstate" {
+  bucket = aws_s3_bucket.tfstate.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
 resource "aws_iam_role_policy_attachment" "ssm_managed_policy" {
   role       = aws_iam_role.esb_ssm_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+# ── Permissions for Terraform CI to manage this stack ─────────
+resource "aws_iam_role_policy" "terraform_ci" {
+  name = "esb-terraform-ci"
+  role = aws_iam_role.esb_ssm_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "TerraformStateBucket"
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket",
+          "s3:GetBucketLocation",
+          "s3:GetBucketVersioning"
+        ]
+        Resource = aws_s3_bucket.tfstate.arn
+      },
+      {
+        Sid    = "TerraformStateObject"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject"
+        ]
+        Resource = "${aws_s3_bucket.tfstate.arn}/esb-demo/terraform.tfstate"
+      },
+      {
+        Sid    = "ManageBuckets"
+        Effect = "Allow"
+        Action = "s3:*"
+        Resource = [
+          aws_s3_bucket.transfer.arn,
+          "${aws_s3_bucket.transfer.arn}/*",
+          aws_s3_bucket.tfstate.arn,
+          "${aws_s3_bucket.tfstate.arn}/*"
+        ]
+      },
+      {
+        Sid    = "ManageEC2"
+        Effect = "Allow"
+        Action = [
+          "ec2:Describe*",
+          "ec2:RunInstances",
+          "ec2:TerminateInstances",
+          "ec2:StartInstances",
+          "ec2:StopInstances",
+          "ec2:ModifyInstanceAttribute",
+          "ec2:CreateTags",
+          "ec2:DeleteTags",
+          "ec2:CreateSecurityGroup",
+          "ec2:DeleteSecurityGroup",
+          "ec2:AuthorizeSecurityGroupEgress",
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:RevokeSecurityGroupEgress",
+          "ec2:RevokeSecurityGroupIngress"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "ManageIAM"
+        Effect = "Allow"
+        Action = [
+          "iam:GetRole",
+          "iam:CreateRole",
+          "iam:DeleteRole",
+          "iam:UpdateRole",
+          "iam:UpdateAssumeRolePolicy",
+          "iam:TagRole",
+          "iam:UntagRole",
+          "iam:ListRoleTags",
+          "iam:AttachRolePolicy",
+          "iam:DetachRolePolicy",
+          "iam:ListAttachedRolePolicies",
+          "iam:GetRolePolicy",
+          "iam:PutRolePolicy",
+          "iam:DeleteRolePolicy",
+          "iam:ListRolePolicies",
+          "iam:PassRole",
+          "iam:GetInstanceProfile",
+          "iam:CreateInstanceProfile",
+          "iam:DeleteInstanceProfile",
+          "iam:AddRoleToInstanceProfile",
+          "iam:RemoveRoleFromInstanceProfile",
+          "iam:TagInstanceProfile",
+          "iam:UntagInstanceProfile",
+          "iam:GetOpenIDConnectProvider",
+          "iam:CreateOpenIDConnectProvider",
+          "iam:DeleteOpenIDConnectProvider",
+          "iam:UpdateOpenIDConnectProviderThumbprint",
+          "iam:AddClientIDToOpenIDConnectProvider",
+          "iam:RemoveClientIDFromOpenIDConnectProvider",
+          "iam:TagOpenIDConnectProvider",
+          "iam:UntagOpenIDConnectProvider"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
 }
 
 resource "aws_iam_instance_profile" "esb_profile" {
@@ -168,9 +317,9 @@ resource "aws_security_group" "esb_sg" {
 
 # ── EC2: esb-build ────────────────────────────────────────────
 resource "aws_instance" "esb_build" {
-  ami                  = data.aws_ami.amazon_linux.id
-  instance_type        = var.instance_type
-  iam_instance_profile = aws_iam_instance_profile.esb_profile.name
+  ami                    = data.aws_ami.amazon_linux.id
+  instance_type          = var.instance_type
+  iam_instance_profile   = aws_iam_instance_profile.esb_profile.name
   vpc_security_group_ids = [aws_security_group.esb_sg.id]
 
   tags = {
@@ -180,9 +329,9 @@ resource "aws_instance" "esb_build" {
 
 # ── EC2: esb-deploy ───────────────────────────────────────────
 resource "aws_instance" "esb_deploy" {
-  ami                  = data.aws_ami.amazon_linux.id
-  instance_type        = var.instance_type
-  iam_instance_profile = aws_iam_instance_profile.esb_profile.name
+  ami                    = data.aws_ami.amazon_linux.id
+  instance_type          = var.instance_type
+  iam_instance_profile   = aws_iam_instance_profile.esb_profile.name
   vpc_security_group_ids = [aws_security_group.esb_sg.id]
 
   tags = {
@@ -209,4 +358,9 @@ output "esb_ssm_role_arn" {
 output "transfer_bucket" {
   description = "S3 bucket for transferring files between instances"
   value       = aws_s3_bucket.transfer.id
+}
+
+output "tfstate_bucket" {
+  description = "S3 bucket holding the Terraform remote state file"
+  value       = aws_s3_bucket.tfstate.id
 }
