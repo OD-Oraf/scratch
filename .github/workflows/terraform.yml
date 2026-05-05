@@ -20,7 +20,7 @@ on:
 env:
   AWS_REGION: us-east-1
   TF_WORKING_DIR: terraform/esb-demo
-  IAM_ROLE_ARN: ${{ secrets.ESB_SSM_ROLE_ARN }}
+  IAM_ROLE_ARN: arn:aws:iam::289491622160:role/esb-ssm-role
 
 permissions:
   id-token: write
