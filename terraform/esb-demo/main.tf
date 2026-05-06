@@ -127,6 +127,15 @@ resource "aws_s3_bucket_lifecycle_configuration" "bucket-config" {
   }
 }
 
+resource "aws_s3_bucket" "my_simple_bucket" {
+  bucket = "od-test-bucket-2026" # Must be globally unique
+
+  tags = {
+    Name        = "oo"
+    Environment = "dev"
+  }
+}
+
 
 resource "aws_iam_role_policy" "s3_transfer" {
   name = "esb-s3-transfer"
