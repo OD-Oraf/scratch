@@ -194,6 +194,108 @@ resource "aws_iam_role_policy_attachment" "ssm_managed_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
+# ── Permissions for Terraform CI to manage this stack ─────────
+resource "aws_iam_role_policy" "terraform_ci" {
+  name = "esb-terraform-ci"
+  role = aws_iam_role.esb_ssm_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "TerraformStateBucket"
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket",
+          "s3:GetBucketLocation",
+          "s3:GetBucketVersioning"
+        ]
+        Resource = aws_s3_bucket.tfstate.arn
+      },
+      {
+        Sid    = "TerraformStateObject"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject"
+        ]
+        Resource = "${aws_s3_bucket.tfstate.arn}/esb-demo/terraform.tfstate"
+      },
+      {
+        Sid    = "ManageBuckets"
+        Effect = "Allow"
+        Action = "s3:*"
+        Resource = [
+          aws_s3_bucket.transfer.arn,
+          "${aws_s3_bucket.transfer.arn}/*",
+          aws_s3_bucket.tfstate.arn,
+          "${aws_s3_bucket.tfstate.arn}/*"
+        ]
+      },
+      {
+        Sid    = "ManageEC2"
+        Effect = "Allow"
+        Action = [
+          "ec2:Describe*",
+          "ec2:RunInstances",
+          "ec2:TerminateInstances",
+          "ec2:StartInstances",
+          "ec2:StopInstances",
+          "ec2:ModifyInstanceAttribute",
+          "ec2:CreateTags",
+          "ec2:DeleteTags",
+          "ec2:CreateSecurityGroup",
+          "ec2:DeleteSecurityGroup",
+          "ec2:AuthorizeSecurityGroupEgress",
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:RevokeSecurityGroupEgress",
+          "ec2:RevokeSecurityGroupIngress"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "ManageIAM"
+        Effect = "Allow"
+        Action = [
+          "iam:GetRole",
+          "iam:CreateRole",
+          "iam:DeleteRole",
+          "iam:UpdateRole",
+          "iam:UpdateAssumeRolePolicy",
+          "iam:TagRole",
+          "iam:UntagRole",
+          "iam:ListRoleTags",
+          "iam:AttachRolePolicy",
+          "iam:DetachRolePolicy",
+          "iam:ListAttachedRolePolicies",
+          "iam:GetRolePolicy",
+          "iam:PutRolePolicy",
+          "iam:DeleteRolePolicy",
+          "iam:ListRolePolicies",
+          "iam:PassRole",
+          "iam:GetInstanceProfile",
+          "iam:CreateInstanceProfile",
+          "iam:DeleteInstanceProfile",
+          "iam:AddRoleToInstanceProfile",
+          "iam:RemoveRoleFromInstanceProfile",
+          "iam:TagInstanceProfile",
+          "iam:UntagInstanceProfile",
+          "iam:GetOpenIDConnectProvider",
+          "iam:CreateOpenIDConnectProvider",
+          "iam:DeleteOpenIDConnectProvider",
+          "iam:UpdateOpenIDConnectProviderThumbprint",
+          "iam:AddClientIDToOpenIDConnectProvider",
+          "iam:RemoveClientIDFromOpenIDConnectProvider",
+          "iam:TagOpenIDConnectProvider",
+          "iam:UntagOpenIDConnectProvider"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 resource "aws_iam_instance_profile" "esb_profile" {
   name = "esb-ssm-instance-profile"
   role = aws_iam_role.esb_ssm_role.name
